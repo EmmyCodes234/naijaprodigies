@@ -9,13 +9,17 @@ import rateLimiter, { RateLimitError, formatTimeUntilReset } from '../utils/rate
 
 export interface PostService {
   createPost(userId: string, content: string, imageUrls?: string[]): Promise<Post>
-  getPosts(limit: number, offset: number): Promise<Post[]>
-  getPostById(postId: string): Promise<Post>
+  getPosts(limit: number, offset: number, currentUserId?: string, feedType?: 'for-you' | 'following'): Promise<Post[]>
+  getPostById(postId: string, currentUserId?: string): Promise<Post>
   deletePost(postId: string, userId: string): Promise<void>
   likePost(postId: string, userId: string): Promise<void>
   unlikePost(postId: string, userId: string): Promise<void>
   createComment(postId: string, userId: string, content: string, parentCommentId?: string): Promise<Comment>
   createReRack(postId: string, userId: string, quoteText?: string): Promise<Post>
+  savePost(postId: string, userId: string): Promise<void>
+  unsavePost(postId: string, userId: string): Promise<void>
+  getSavedPosts(userId: string): Promise<Post[]>
+  getTrends(limit?: number): Promise<{ tag: string; count: number }[]>
 }
 
 /**
@@ -47,6 +51,9 @@ export const createPost = async (
     throw new Error('Post content cannot be empty')
   }
 
+  // Extract tags
+  const tags = content.match(/#[\w]+/g) || [];
+
   // Insert post into database
   const { data: postData, error: postError } = await supabase
     .from('posts')
@@ -60,6 +67,23 @@ export const createPost = async (
 
   if (postError) {
     throw new Error(`Failed to create post: ${postError.message}`)
+  }
+
+  // Insert tags if any
+  if (tags.length > 0) {
+    const tagRecords = tags.map(tag => ({
+      post_id: postData.id,
+      tag: tag.substring(1).toLowerCase(), // Remove # and normalize
+    }));
+
+    const { error: tagError } = await supabase
+      .from('post_tags')
+      .insert(tagRecords);
+
+    if (tagError) {
+      console.error('Failed to insert tags:', tagError);
+      // Don't fail the post creation for this, just log it
+    }
   }
 
   // Insert images if provided
@@ -487,8 +511,47 @@ export const getPostById = async (postId: string, currentUserId?: string): Promi
  * Delete a post (must be owner)
  */
 export const deletePost = async (postId: string, userId: string): Promise<void> => {
-  // Implementation will be added in future tasks
-  throw new Error('Not implemented')
+  // 1. Fetch post to get images
+  const { data: post, error: fetchError } = await supabase
+    .from('posts')
+    .select('user_id')
+    .eq('id', postId)
+    .single()
+
+  if (fetchError) {
+    throw new Error(`Failed to fetch post for deletion: ${fetchError.message}`)
+  }
+
+  if (post.user_id !== userId) {
+    throw new Error('Unauthorized: You can only delete your own posts')
+  }
+
+  // 2. Delete images from storage (if any)
+  const { data: images } = await supabase
+    .from('post_images')
+    .select('image_url')
+    .eq('post_id', postId)
+
+  if (images && images.length > 0) {
+    const filesToRemove = images.map(img => {
+      const parts = img.image_url.split('/')
+      return `${userId}/${parts[parts.length - 1]}`
+    })
+
+    await supabase.storage
+      .from('posts')
+      .remove(filesToRemove)
+  }
+
+  // 3. Delete post from DB
+  const { error: deleteError } = await supabase
+    .from('posts')
+    .delete()
+    .eq('id', postId)
+
+  if (deleteError) {
+    throw new Error(`Failed to delete post: ${deleteError.message}`)
+  }
 }
 
 /**
@@ -503,7 +566,6 @@ export const likePost = async (postId: string, userId: string): Promise<void> =>
     })
 
   if (error) {
-    // Check if it's a duplicate key error (already liked)
     if (error.code === '23505') {
       throw new Error('Post already liked')
     }
@@ -1041,4 +1103,191 @@ export const subscribeToReRacks = (
   return () => {
     supabase.removeChannel(channel)
   }
+}
+
+/**
+ * Save a post for the user
+ */
+export const savePost = async (postId: string, userId: string): Promise<void> => {
+  const { error } = await supabase
+    .from('saved_posts')
+    .insert({
+      post_id: postId,
+      user_id: userId
+    })
+
+  if (error) {
+    if (error.code === '23505') {
+      // Already saved, ignore
+      return
+    }
+    throw new Error(`Failed to save post: ${error.message}`)
+  }
+}
+
+/**
+ * Unsave a post
+ */
+export const unsavePost = async (postId: string, userId: string): Promise<void> => {
+  const { error } = await supabase
+    .from('saved_posts')
+    .delete()
+    .eq('post_id', postId)
+    .eq('user_id', userId)
+
+  if (error) {
+    throw new Error(`Failed to unsave post: ${error.message}`)
+  }
+}
+
+/**
+ * Get saved posts for a user
+ */
+export const getSavedPosts = async (userId: string): Promise<Post[]> => {
+  // 1. Get saved post IDs
+  const { data: savedData, error: savedError } = await supabase
+    .from('saved_posts')
+    .select('post_id, created_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+
+  if (savedError) {
+    throw new Error(`Failed to fetch saved posts: ${savedError.message}`)
+  }
+
+  if (!savedData || savedData.length === 0) {
+    return []
+  }
+
+  const postIds = savedData.map(item => item.post_id)
+
+  // 2. Fetch the actual posts
+  const { data: postsData, error: postsError } = await supabase
+    .from('posts')
+    .select(`
+      id,
+      user_id,
+      content,
+      created_at,
+      updated_at,
+      is_rerack,
+      original_post_id,
+      quote_text,
+      user:users!posts_user_id_fkey(
+        id,
+        handle,
+        name,
+        avatar,
+        bio,
+        rank,
+        verified,
+        created_at,
+        updated_at
+      ),
+      post_images(
+        image_url,
+        position
+      )
+    `)
+    .in('id', postIds)
+
+  if (postsError) {
+    throw new Error(`Failed to fetch posts details: ${postsError.message}`)
+  }
+
+  if (!postsData) return []
+
+  // Create a map for easy access and maintain saved order
+  const postsMap = new Map(postsData.map(p => [p.id, p]))
+  const orderedPosts = postIds
+    .map(id => postsMap.get(id))
+    .filter(p => p !== undefined)
+
+  // Fetch engagement counts
+  const { data: likesData } = await supabase
+    .from('likes')
+    .select('post_id, user_id')
+    .in('post_id', postIds)
+
+  const { data: commentsData } = await supabase
+    .from('comments')
+    .select('post_id')
+    .in('post_id', postIds)
+
+  const { data: reracksData } = await supabase
+    .from('posts')
+    .select('original_post_id')
+    .in('original_post_id', postIds)
+    .eq('is_rerack', true)
+
+  const likesCounts = likesData?.reduce((acc: any, like: any) => {
+    acc[like.post_id] = (acc[like.post_id] || 0) + 1
+    return acc
+  }, {}) || {}
+
+  const likedByCurrentUser = new Set(
+    likesData?.filter((like: any) => like.user_id === userId).map((like: any) => like.post_id) || []
+  )
+
+  const commentsCounts = commentsData?.reduce((acc: any, comment: any) => {
+    acc[comment.post_id] = (acc[comment.post_id] || 0) + 1
+    return acc
+  }, {}) || {}
+
+  const reracksCounts = reracksData?.reduce((acc: any, rerack: any) => {
+    acc[rerack.original_post_id] = (acc[rerack.original_post_id] || 0) + 1
+    return acc
+  }, {}) || {}
+
+  // Transform data
+  return orderedPosts.map(post => {
+    // Re-racks inside saved posts logic (simplified)
+    const originalPost = undefined
+
+    return {
+      id: post.id,
+      user_id: post.user_id,
+      user: Array.isArray(post.user) ? post.user[0] : post.user,
+      content: post.content,
+      images: post.post_images?.sort((a: any, b: any) => a.position - b.position).map((img: any) => img.image_url) || [],
+      likes_count: likesCounts[post.id] || 0,
+      comments_count: commentsCounts[post.id] || 0,
+      reracks_count: reracksCounts[post.id] || 0,
+      created_at: post.created_at,
+      is_rerack: post.is_rerack,
+      original_post: originalPost,
+      quote_text: post.quote_text,
+      is_liked_by_current_user: likedByCurrentUser.has(post.id)
+    }
+  })
+}
+
+/**
+ * Get trending tags
+ */
+export const getTrends = async (limit: number = 5): Promise<{ tag: string; count: number }[]> => {
+  // This is a bit complex in Supabase without a specific stats table or RPC.
+  // We will fetch recent tags and aggregate them client-side (or server-side if this was a Function).
+  // For scalability, we should use an RPC function or a materialized view.
+  // For now, let's fetch the last 500 tags and count them.
+
+  const { data, error } = await supabase
+    .from('post_tags')
+    .select('tag')
+    .order('created_at', { ascending: false })
+    .limit(500);
+
+  if (error) throw error;
+
+  const tagCounts: Record<string, number> = {};
+  data?.forEach(item => {
+    // Normalize case again just to be safe
+    const tag = item.tag.toLowerCase();
+    tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+  });
+
+  return Object.entries(tagCounts)
+    .map(([tag, count]) => ({ tag: `#${tag}`, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit);
 }

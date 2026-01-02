@@ -13,6 +13,9 @@ import Notifications from './components/pages/Notifications';
 import PostDetail from './components/pages/PostDetail';
 import UserProfile from './components/pages/UserProfile';
 import Messages from './components/pages/Messages';
+import Explore from './components/pages/Explore';
+import Bookmarks from './components/pages/Bookmarks';
+import Settings from './components/pages/Settings';
 import WordWizardModal from './components/WordWizardModal';
 import AuthModal from './components/Auth/AuthModal';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
@@ -85,6 +88,21 @@ const AppContent: React.FC = () => {
           <Route path="/messages" element={
             <ProtectedRoute>
               <Messages />
+            </ProtectedRoute>
+          } />
+          <Route path="/explore" element={
+            <ProtectedRoute>
+              <Explore />
+            </ProtectedRoute>
+          } />
+          <Route path="/bookmarks" element={
+            <ProtectedRoute>
+              <Bookmarks />
+            </ProtectedRoute>
+          } />
+          <Route path="/settings" element={
+            <ProtectedRoute>
+              <Settings />
             </ProtectedRoute>
           } />
           <Route path="/story" element={<OurStory />} />

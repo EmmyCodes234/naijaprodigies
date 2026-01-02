@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Icon } from '@iconify/react';
 import { Comment, User } from '../../types';
 import { formatRelativeTime } from '../../utils/dateUtils';
+import { getAvatarUrl } from '../../utils/userUtils';
 
 interface CommentThreadProps {
   comments: Comment[];
@@ -31,9 +32,9 @@ const CommentItem: React.FC<{
       <div className="flex gap-2">
         {/* Avatar */}
         <div className="flex-shrink-0">
-          <img 
-            src={comment.user.avatar || '/default-avatar.png'} 
-            alt={comment.user.name} 
+          <img
+            src={getAvatarUrl(comment.user)}
+            alt={comment.user.name}
             className="w-8 h-8 rounded-full object-cover"
           />
         </div>
@@ -72,12 +73,12 @@ const CommentItem: React.FC<{
           {/* Reply Input */}
           {isReplying && (
             <div className="mt-3 flex gap-2">
-              <img 
-                src={currentUser.avatar || '/default-avatar.png'} 
-                className="w-7 h-7 rounded-full object-cover" 
+              <img
+                src={getAvatarUrl(currentUser)}
+                className="w-7 h-7 rounded-full object-cover"
               />
               <div className="flex-1">
-                <textarea 
+                <textarea
                   className="w-full bg-gray-50 rounded-lg p-2 text-sm focus:outline-none focus:ring-2 focus:ring-nsp-teal/20 text-gray-900 placeholder-gray-500 resize-none"
                   placeholder={`Reply to @${comment.user.handle}`}
                   rows={2}
@@ -86,13 +87,13 @@ const CommentItem: React.FC<{
                   autoFocus
                 />
                 <div className="flex justify-end gap-2 mt-2">
-                  <button 
+                  <button
                     onClick={() => setIsReplying(false)}
                     className="text-gray-600 text-xs font-medium px-3 py-1 rounded-full hover:bg-gray-100 transition-colors"
                   >
                     Cancel
                   </button>
-                  <button 
+                  <button
                     onClick={handleReplySubmit}
                     disabled={!replyText.trim()}
                     className="bg-nsp-teal text-white text-xs font-bold px-3 py-1 rounded-full disabled:opacity-50 disabled:cursor-not-allowed hover:bg-nsp-dark-teal transition-colors"
@@ -124,11 +125,11 @@ const CommentItem: React.FC<{
   );
 };
 
-const CommentThread: React.FC<CommentThreadProps> = ({ 
-  comments, 
-  currentUser, 
+const CommentThread: React.FC<CommentThreadProps> = ({
+  comments,
+  currentUser,
   onReply,
-  depth = 0 
+  depth = 0
 }) => {
   if (comments.length === 0) {
     return null;

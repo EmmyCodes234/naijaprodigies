@@ -5,11 +5,15 @@ import { User, Post } from '../../types';
 import { getUserById, getUserPosts } from '../../services/userService';
 import { useCurrentUser } from '../../hooks/useCurrentUser';
 import PostCard from '../Social/PostCard';
-import { likePost, unlikePost } from '../../services/postService';
+import { likePost, unlikePost, createComment, createReRack, deletePost } from '../../services/postService';
+import { useToast } from '../../contexts/ToastContext';
 import { getFollowerCount, getFollowingCount } from '../../services/followService';
 import FollowListModal from '../FollowListModal';
 import ProfileEditModal from '../ProfileEditModal';
 import FollowButton from '../FollowButton';
+import SkeletonProfileHeader from '../Loaders/SkeletonProfileHeader';
+import SkeletonPost from '../Loaders/SkeletonPost';
+import { getAvatarUrl } from '../../utils/userUtils';
 
 type TabType = 'posts' | 'media' | 'liked';
 
@@ -17,7 +21,8 @@ const UserProfile: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
   const { profile: currentUser } = useCurrentUser();
-  
+  const { addToast } = useToast();
+
   const [user, setUser] = useState<User | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [activeTab, setActiveTab] = useState<TabType>('posts');
@@ -44,7 +49,7 @@ const UserProfile: React.FC = () => {
         const userData = await getUserById(userId);
         setUser(userData);
         setError(null);
-        
+
         // Load follower/following counts
         const [followers, following] = await Promise.all([
           getFollowerCount(userId),
@@ -97,10 +102,10 @@ const UserProfile: React.FC = () => {
       prevPosts.map(p =>
         p.id === postId
           ? {
-              ...p,
-              is_liked_by_current_user: !isLiked,
-              likes_count: isLiked ? p.likes_count - 1 : p.likes_count + 1
-            }
+            ...p,
+            is_liked_by_current_user: !isLiked,
+            likes_count: isLiked ? p.likes_count - 1 : p.likes_count + 1
+          }
           : p
       )
     );
@@ -118,10 +123,10 @@ const UserProfile: React.FC = () => {
         prevPosts.map(p =>
           p.id === postId
             ? {
-                ...p,
-                is_liked_by_current_user: isLiked,
-                likes_count: isLiked ? p.likes_count + 1 : p.likes_count - 1
-              }
+              ...p,
+              is_liked_by_current_user: isLiked,
+              likes_count: isLiked ? p.likes_count + 1 : p.likes_count - 1
+            }
             : p
         )
       );
@@ -129,8 +134,52 @@ const UserProfile: React.FC = () => {
   };
 
   const handleReply = async (postId: string, content: string) => {
-    // Reply functionality handled by PostCard component
-    console.log('Reply to post:', postId, content);
+    if (!currentUser) return;
+    try {
+      await createComment(postId, currentUser.id, content);
+      addToast('success', 'Reply sent');
+
+      // Optimistic update for comment count
+      setPosts(prev => prev.map(p =>
+        p.id === postId ? { ...p, comments_count: p.comments_count + 1 } : p
+      ));
+    } catch (err) {
+      console.error('Failed to reply:', err);
+      addToast('error', 'Failed to send reply');
+    }
+  };
+
+  const handleReRack = async (postId: string, type: 'simple' | 'quote', quoteText?: string) => {
+    if (!currentUser) return;
+    try {
+      await createReRack(postId, currentUser.id, quoteText);
+      addToast('success', 'Post re-racked!');
+
+      // Optimistic update
+      setPosts(prev => prev.map(p =>
+        p.id === postId ? { ...p, reracks_count: p.reracks_count + 1 } : p
+      ));
+    } catch (err) {
+      console.error('Error reracking:', err);
+      addToast('error', 'Failed to re-rack');
+    }
+  };
+
+  const handleDelete = async (postId: string) => {
+    if (!currentUser) return;
+
+    // Optimistic remove
+    const previousPosts = [...posts];
+    setPosts(prev => prev.filter(p => p.id !== postId));
+
+    try {
+      await deletePost(postId, currentUser.id);
+      addToast('success', 'Post deleted');
+    } catch (err) {
+      console.error('Failed to delete post:', err);
+      setPosts(previousPosts);
+      addToast('error', 'Failed to delete post');
+    }
   };
 
   const handleFollowersClick = () => {
@@ -151,7 +200,7 @@ const UserProfile: React.FC = () => {
   const handleFollowChange = async (isFollowing: boolean) => {
     // Update follower count in real-time
     if (!userId) return;
-    
+
     try {
       const newFollowerCount = await getFollowerCount(userId);
       setFollowerCount(newFollowerCount);
@@ -163,10 +212,10 @@ const UserProfile: React.FC = () => {
   if (loading) {
     return (
       <div className="bg-white min-h-screen pt-16">
-        <div className="max-w-2xl mx-auto px-4 py-8">
-          <div className="flex justify-center items-center h-64">
-            <Icon icon="line-md:loading-twotone-loop" width="48" height="48" className="text-nsp-teal" />
-          </div>
+        <SkeletonProfileHeader />
+        <div className="max-w-2xl mx-auto px-4 mt-8 space-y-4">
+          <SkeletonPost />
+          <SkeletonPost />
         </div>
       </div>
     );
@@ -222,7 +271,7 @@ const UserProfile: React.FC = () => {
             <div className="relative -mt-16 mb-4">
               <div className="relative inline-block">
                 <img
-                  src={user.avatar || '/default-avatar.png'}
+                  src={getAvatarUrl(user)}
                   alt={user.name}
                   className="w-32 h-32 rounded-full border-4 border-white object-cover"
                 />
@@ -237,7 +286,7 @@ const UserProfile: React.FC = () => {
             {/* Action Buttons */}
             <div className="flex justify-end gap-2 mb-4">
               {currentUser?.id === user.id ? (
-                <button 
+                <button
                   onClick={() => setShowEditModal(true)}
                   className="px-4 py-2 border border-gray-300 rounded-full font-bold text-gray-900 hover:bg-gray-50 transition-colors"
                 >
@@ -290,14 +339,14 @@ const UserProfile: React.FC = () => {
 
             {/* Stats */}
             <div className="flex gap-4 text-sm">
-              <button 
+              <button
                 onClick={handleFollowingClick}
                 className="hover:underline"
               >
                 <span className="font-bold text-gray-900">{followingCount}</span>{' '}
                 <span className="text-gray-500">Following</span>
               </button>
-              <button 
+              <button
                 onClick={handleFollowersClick}
                 className="hover:underline"
               >
@@ -313,11 +362,10 @@ const UserProfile: React.FC = () => {
           <div className="flex">
             <button
               onClick={() => setActiveTab('posts')}
-              className={`flex-1 py-4 text-center font-bold transition-colors relative ${
-                activeTab === 'posts'
-                  ? 'text-gray-900'
-                  : 'text-gray-500 hover:bg-gray-50'
-              }`}
+              className={`flex-1 py-4 text-center font-bold transition-colors relative ${activeTab === 'posts'
+                ? 'text-gray-900'
+                : 'text-gray-500 hover:bg-gray-50'
+                }`}
             >
               Posts
               {activeTab === 'posts' && (
@@ -326,11 +374,10 @@ const UserProfile: React.FC = () => {
             </button>
             <button
               onClick={() => setActiveTab('media')}
-              className={`flex-1 py-4 text-center font-bold transition-colors relative ${
-                activeTab === 'media'
-                  ? 'text-gray-900'
-                  : 'text-gray-500 hover:bg-gray-50'
-              }`}
+              className={`flex-1 py-4 text-center font-bold transition-colors relative ${activeTab === 'media'
+                ? 'text-gray-900'
+                : 'text-gray-500 hover:bg-gray-50'
+                }`}
             >
               Media
               {activeTab === 'media' && (
@@ -339,11 +386,10 @@ const UserProfile: React.FC = () => {
             </button>
             <button
               onClick={() => setActiveTab('liked')}
-              className={`flex-1 py-4 text-center font-bold transition-colors relative ${
-                activeTab === 'liked'
-                  ? 'text-gray-900'
-                  : 'text-gray-500 hover:bg-gray-50'
-              }`}
+              className={`flex-1 py-4 text-center font-bold transition-colors relative ${activeTab === 'liked'
+                ? 'text-gray-900'
+                : 'text-gray-500 hover:bg-gray-50'
+                }`}
             >
               Liked
               {activeTab === 'liked' && (
@@ -382,6 +428,8 @@ const UserProfile: React.FC = () => {
                 currentUser={currentUser!}
                 onLike={handleLike}
                 onReply={handleReply}
+                onReRack={handleReRack}
+                onDelete={handleDelete}
               />
             ))
           )}

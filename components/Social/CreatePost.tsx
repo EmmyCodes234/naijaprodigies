@@ -4,6 +4,7 @@ import { User, Post } from '../../types';
 import { createPost } from '../../services/postService';
 import { uploadImages, generatePreview } from '../../services/imageService';
 import { RateLimitError } from '../../utils/rateLimiter';
+import { getAvatarUrl } from '../../utils/userUtils';
 
 interface CreatePostProps {
   currentUser: User;
@@ -65,10 +66,10 @@ const CreatePost: React.FC<CreatePostProps> = ({ currentUser, onPost }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validate content
     if (!content.trim()) return;
-    
+
     // Check character limit
     if (isOverLimit) {
       setError('Post exceeds 280 character limit');
@@ -88,8 +89,8 @@ const CreatePost: React.FC<CreatePostProps> = ({ currentUser, onPost }) => {
           imageUrls = await uploadImages(selectedImages, currentUser.id);
         } catch (uploadError) {
           throw new Error(
-            uploadError instanceof Error 
-              ? uploadError.message 
+            uploadError instanceof Error
+              ? uploadError.message
               : 'Failed to upload images'
           );
         } finally {
@@ -99,12 +100,12 @@ const CreatePost: React.FC<CreatePostProps> = ({ currentUser, onPost }) => {
 
       // Create post with image URLs
       const newPost = await createPost(currentUser.id, content, imageUrls);
-      
+
       // Call the onPost callback if provided
       if (onPost) {
         onPost(newPost);
       }
-      
+
       // Clear the form
       setContent('');
       setSelectedImages([]);
@@ -126,65 +127,63 @@ const CreatePost: React.FC<CreatePostProps> = ({ currentUser, onPost }) => {
   return (
     <div className="flex gap-4">
       <div className="flex-shrink-0 pt-1">
-        <img 
-          src={currentUser.avatar || '/default-avatar.png'} 
-          alt={currentUser.name} 
-          className="w-10 h-10 rounded-full object-cover hover:opacity-90 cursor-pointer" 
+        <img
+          src={getAvatarUrl(currentUser)}
+          alt={currentUser.name}
+          className="w-10 h-10 rounded-full object-cover hover:opacity-90 cursor-pointer"
         />
       </div>
       <form onSubmit={handleSubmit} className="flex-1">
         <div className="border-b border-gray-100 pb-2">
-            <textarea
-                value={content}
-                onChange={(e) => {
-                    setContent(e.target.value);
-                    setError(null); // Clear error on input change
-                    e.target.style.height = 'auto';
-                    e.target.style.height = e.target.value ? `${e.target.scrollHeight}px` : 'auto';
-                }}
-                placeholder="What is happening?!"
-                className={`w-full bg-transparent border-none focus:ring-0 text-xl placeholder-gray-500 text-gray-900 resize-none overflow-hidden min-h-[48px] ${
-                  isOverLimit ? 'text-red-500' : ''
-                }`}
-                rows={1}
-                disabled={isSubmitting}
-            />
-            
-            {/* Image Previews */}
-            {imagePreviews.length > 0 && (
-              <div className={`mt-3 grid gap-2 ${
-                imagePreviews.length === 1 ? 'grid-cols-1' :
-                imagePreviews.length === 2 ? 'grid-cols-2' :
+          <textarea
+            value={content}
+            onChange={(e) => {
+              setContent(e.target.value);
+              setError(null); // Clear error on input change
+              e.target.style.height = 'auto';
+              e.target.style.height = e.target.value ? `${e.target.scrollHeight}px` : 'auto';
+            }}
+            placeholder="What is happening?!"
+            className={`w-full bg-transparent border-none focus:ring-0 text-xl placeholder-gray-500 text-gray-900 resize-none overflow-hidden min-h-[48px] ${isOverLimit ? 'text-red-500' : ''
+              }`}
+            rows={1}
+            disabled={isSubmitting}
+          />
+
+          {/* Image Previews */}
+          {imagePreviews.length > 0 && (
+            <div className={`mt-3 grid gap-2 ${imagePreviews.length === 1 ? 'grid-cols-1' :
+              imagePreviews.length === 2 ? 'grid-cols-2' :
                 imagePreviews.length === 3 ? 'grid-cols-3' :
-                'grid-cols-2'
+                  'grid-cols-2'
               }`}>
-                {imagePreviews.map((preview, index) => (
-                  <div key={index} className="relative group">
-                    <img
-                      src={preview}
-                      alt={`Preview ${index + 1}`}
-                      className="w-full h-48 object-cover rounded-2xl"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveImage(index)}
-                      className="absolute top-2 right-2 bg-gray-900/80 hover:bg-gray-900 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                      disabled={isSubmitting}
-                    >
-                      <Icon icon="ph:x" width="16" height="16" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+              {imagePreviews.map((preview, index) => (
+                <div key={index} className="relative group">
+                  <img
+                    src={preview}
+                    alt={`Preview ${index + 1}`}
+                    className="w-full h-48 object-cover rounded-2xl"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveImage(index)}
+                    className="absolute top-2 right-2 bg-gray-900/80 hover:bg-gray-900 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                    disabled={isSubmitting}
+                  >
+                    <Icon icon="ph:x" width="16" height="16" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-        
+
         {error && (
           <div className="mt-2 text-red-500 text-sm">
             {error}
           </div>
         )}
-        
+
         <div className="flex justify-between items-center mt-3">
           <div className="flex gap-1 items-center">
             <div className="flex gap-1 text-nsp-teal">
@@ -197,10 +196,10 @@ const CreatePost: React.FC<CreatePostProps> = ({ currentUser, onPost }) => {
                 className="hidden"
                 disabled={isSubmitting || selectedImages.length >= 4}
               />
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="p-2 rounded-full hover:bg-nsp-teal/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
+                className="p-2 rounded-full hover:bg-nsp-teal/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Media"
                 disabled={isSubmitting || selectedImages.length >= 4}
               >
@@ -219,19 +218,18 @@ const CreatePost: React.FC<CreatePostProps> = ({ currentUser, onPost }) => {
                 <Icon icon="ph:calendar-plus" width="20" height="20" />
               </button>
             </div>
-            
+
             {content.length > 0 && (
-              <span className={`text-sm ml-2 ${
-                isOverLimit ? 'text-red-500 font-semibold' : 
-                charCount > charLimit - 20 ? 'text-yellow-600' : 
-                'text-gray-500'
-              }`}>
+              <span className={`text-sm ml-2 ${isOverLimit ? 'text-red-500 font-semibold' :
+                charCount > charLimit - 20 ? 'text-yellow-600' :
+                  'text-gray-500'
+                }`}>
                 {charCount}/{charLimit}
               </span>
             )}
           </div>
-          
-          <button 
+
+          <button
             type="submit"
             disabled={!content.trim() || isOverLimit || isSubmitting}
             className="bg-nsp-teal hover:bg-nsp-dark-teal disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-1.5 px-5 rounded-full transition-all shadow-sm"

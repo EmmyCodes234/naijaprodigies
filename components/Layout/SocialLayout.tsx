@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { getTrends } from '../../services/postService';
 import { Icon } from '@iconify/react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import SearchBar from '../SearchBar';
+import CreatePostModal from '../Social/CreatePostModal';
 import { useCurrentUser } from '../../hooks/useCurrentUser';
 import { useNotification } from '../../contexts/NotificationContext';
+import { getAvatarUrl } from '../../utils/userUtils';
 
 interface SocialLayoutProps {
     children: React.ReactNode;
@@ -15,6 +18,20 @@ const SocialLayout: React.FC<SocialLayoutProps> = ({ children }) => {
     const { profile: currentUser, loading: userLoading } = useCurrentUser();
     const { unreadCount } = useNotification();
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+    const [isPostModalOpen, setIsPostModalOpen] = useState(false);
+    const [trends, setTrends] = useState<{ tag: string; count: number }[]>([]);
+
+    useEffect(() => {
+        const fetchTrends = async () => {
+            try {
+                const data = await getTrends(5);
+                setTrends(data);
+            } catch (error) {
+                console.error('Failed to fetch trends', error);
+            }
+        };
+        fetchTrends();
+    }, []);
 
     // If loading, show a loading screen or skeleton? 
     // For layout, maybe just render nothing or empty sidebars until user loads.
@@ -22,10 +39,10 @@ const SocialLayout: React.FC<SocialLayoutProps> = ({ children }) => {
 
     const NavItems = [
         { icon: 'ph:house-fill', label: 'Home', path: '/feed' },
-        { icon: 'ph:hash-bold', label: 'Explore', path: '#' },
+        { icon: 'ph:hash-bold', label: 'Explore', path: '/explore' },
         { icon: 'ph:bell-bold', label: 'Notifications', path: '/notifications' },
         { icon: 'ph:envelope-bold', label: 'Messages', path: '/messages' },
-        { icon: 'ph:bookmark-simple-bold', label: 'Bookmarks', path: '#' },
+        { icon: 'ph:bookmark-simple-bold', label: 'Bookmarks', path: '/bookmarks' },
         { icon: 'ph:user-bold', label: 'Profile', path: currentUser ? `/profile/${currentUser.id}` : '#' },
     ];
 
@@ -64,17 +81,23 @@ const SocialLayout: React.FC<SocialLayoutProps> = ({ children }) => {
                             );
                         })}
 
-                        <button className="hidden xl:flex items-center justify-center bg-nsp-teal hover:bg-nsp-dark-teal text-white font-bold text-lg py-3 rounded-full shadow-lg transition-colors w-full mt-4">
+                        <button
+                            onClick={() => setIsPostModalOpen(true)}
+                            className="hidden xl:flex items-center justify-center bg-nsp-teal hover:bg-nsp-dark-teal text-white font-bold text-lg py-3 rounded-full shadow-lg transition-colors w-full mt-4"
+                        >
                             Post
                         </button>
-                        <button className="xl:hidden flex items-center justify-center bg-nsp-teal hover:bg-nsp-dark-teal text-white p-3 rounded-full shadow-lg transition-colors mt-4">
+                        <button
+                            onClick={() => setIsPostModalOpen(true)}
+                            className="xl:hidden flex items-center justify-center bg-nsp-teal hover:bg-nsp-dark-teal text-white p-3 rounded-full shadow-lg transition-colors mt-4"
+                        >
                             <Icon icon="ph:feather-bold" width="24" height="24" />
                         </button>
                     </nav>
 
                     {currentUser && (
                         <div className="mt-auto mb-4 w-full flex items-center gap-3 p-3 rounded-full hover:bg-gray-100 cursor-pointer transition-colors">
-                            <img src={currentUser.avatar || '/default-avatar.png'} alt="Me" className="w-10 h-10 rounded-full object-cover" />
+                            <img src={getAvatarUrl(currentUser)} alt="Me" className="w-10 h-10 rounded-full object-cover" />
                             <div className="hidden xl:block flex-1 overflow-hidden">
                                 <div className="flex items-center gap-1">
                                     <p className="font-bold text-sm truncate text-gray-900">{currentUser.name}</p>
@@ -120,27 +143,27 @@ const SocialLayout: React.FC<SocialLayoutProps> = ({ children }) => {
                         <SearchBar />
                     </div>
 
+
                     {/* Trends */}
                     <div className="bg-gray-50 rounded-2xl overflow-hidden mb-6">
                         <div className="p-4">
                             <h3 className="font-black text-xl text-nsp-dark-teal mb-4">Trends for you</h3>
-                            <div className="space-y-6">
-                                {[
-                                    { meta: 'Trending in Nigeria', tag: '#LagosGrandSlam', count: '5,234 posts' },
-                                    { meta: 'Strategy · Trending', tag: 'Double-Double', count: '1,432 posts' },
-                                    { meta: 'Competition · Live', tag: 'Wellington vs Eta', count: '12.5K posts' },
-                                    { meta: 'Trending', tag: 'Dictionary Update', count: '3,100 posts' },
-                                ].map((trend, i) => (
-                                    <div key={i} className="cursor-pointer hover:bg-gray-100 -mx-4 px-4 py-2 transition-colors relative">
-                                        <div className="flex justify-between items-start text-xs text-gray-500 mb-1">
-                                            <span>{trend.meta}</span>
-                                            <Icon icon="ph:dots-three-bold" className="hover:text-nsp-teal rounded-full p-1 -m-1" width="24" height="24" />
+                            {trends.length > 0 ? (
+                                <div className="space-y-6">
+                                    {trends.map((trend, i) => (
+                                        <div key={i} className="cursor-pointer hover:bg-gray-100 -mx-4 px-4 py-2 transition-colors relative">
+                                            <div className="flex justify-between items-start text-xs text-gray-500 mb-1">
+                                                <span>Trending in NSP</span>
+                                                <Icon icon="ph:dots-three-bold" className="hover:text-nsp-teal rounded-full p-1 -m-1" width="24" height="24" />
+                                            </div>
+                                            <div className="font-bold text-gray-900 mb-0.5">{trend.tag}</div>
+                                            <div className="text-xs text-gray-500">{trend.count} posts</div>
                                         </div>
-                                        <div className="font-bold text-gray-900 mb-0.5">{trend.tag}</div>
-                                        <div className="text-xs text-gray-500">{trend.count}</div>
-                                    </div>
-                                ))}
-                            </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-gray-500 text-sm">No trends right now</div>
+                            )}
                             <div className="mt-4 text-nsp-teal text-sm font-medium cursor-pointer hover:underline">
                                 Show more
                             </div>
@@ -185,7 +208,10 @@ const SocialLayout: React.FC<SocialLayoutProps> = ({ children }) => {
             </div>
 
             {/* Mobile Floating Action Button */}
-            <button className="md:hidden fixed bottom-20 right-4 z-40 bg-nsp-teal text-white p-4 rounded-full shadow-xl hover:scale-105 transition-transform">
+            <button
+                onClick={() => setIsPostModalOpen(true)}
+                className="md:hidden fixed bottom-20 right-4 z-40 bg-nsp-teal text-white p-4 rounded-full shadow-xl hover:scale-105 transition-transform"
+            >
                 <Icon icon="ph:plus-bold" width="24" height="24" />
             </button>
 
@@ -219,7 +245,7 @@ const SocialLayout: React.FC<SocialLayoutProps> = ({ children }) => {
                 {currentUser && (
                     <button onClick={() => navigate(`/profile/${currentUser.id}`)} className="p-3">
                         <img
-                            src={currentUser.avatar || '/default-avatar.png'}
+                            src={getAvatarUrl(currentUser)}
                             alt="Me"
                             className={`w-7 h-7 rounded-full object-cover ${location.pathname === `/profile/${currentUser.id}` ? 'border-2 border-nsp-teal' : ''}`}
                         />
@@ -246,7 +272,7 @@ const SocialLayout: React.FC<SocialLayoutProps> = ({ children }) => {
                             {/* Header Info */}
                             <div className="mb-6">
                                 <div className="flex justify-between items-start mb-3">
-                                    <img src={currentUser.avatar || '/default-avatar.png'} alt="Me" className="w-10 h-10 rounded-full object-cover border border-gray-100" />
+                                    <img src={getAvatarUrl(currentUser)} alt="Me" className="w-10 h-10 rounded-full object-cover border border-gray-100" />
                                 </div>
                                 <div className="flex items-center gap-1">
                                     <h3 className="font-bold text-lg text-gray-900 leading-tight mb-0.5">{currentUser.name}</h3>
@@ -267,21 +293,25 @@ const SocialLayout: React.FC<SocialLayoutProps> = ({ children }) => {
                             {/* Navigation Links */}
                             <nav className="space-y-1">
                                 {[
-                                    { icon: 'ph:user-bold', label: 'Profile' },
-                                    { icon: 'ph:star-four-fill', label: 'NSP Premium', color: 'text-nsp-yellow' },
-                                    { icon: 'ph:chat-teardrop-text-bold', label: 'Topics' },
-                                    { icon: 'ph:bookmark-simple-bold', label: 'Bookmarks' },
-                                    { icon: 'ph:list-dashes-bold', label: 'Lists' },
-                                    { icon: 'ph:microphone-stage-bold', label: 'Spaces' },
+                                    { icon: 'ph:user-bold', label: 'Profile', path: currentUser ? `/profile/${currentUser.id}` : '#' },
+                                    { icon: 'ph:star-four-fill', label: 'NSP Premium', color: 'text-nsp-yellow', path: '#' },
+                                    { icon: 'ph:hash-bold', label: 'Explore', path: '/explore' },
+                                    { icon: 'ph:bookmark-simple-bold', label: 'Bookmarks', path: '/bookmarks' },
+                                    { icon: 'ph:gear-bold', label: 'Settings', path: '/settings' },
                                 ].map((link) => (
-                                    <a
+                                    <button
                                         key={link.label}
-                                        href="#"
-                                        className="flex items-center gap-4 py-3 px-4 -mx-4 hover:bg-gray-100 transition-colors"
+                                        onClick={() => {
+                                            if (link.path !== '#') {
+                                                navigate(link.path);
+                                                setIsDrawerOpen(false);
+                                            }
+                                        }}
+                                        className="w-full flex items-center gap-4 py-3 px-4 -mx-4 hover:bg-gray-100 transition-colors"
                                     >
                                         <Icon icon={link.icon} width="24" height="24" className={link.color || 'text-gray-900'} />
                                         <span className="font-bold text-xl text-gray-900">{link.label}</span>
-                                    </a>
+                                    </button>
                                 ))}
                             </nav>
 
@@ -289,20 +319,26 @@ const SocialLayout: React.FC<SocialLayoutProps> = ({ children }) => {
 
                             {/* Bottom Links */}
                             <div className="space-y-4">
-                                <div className="flex justify-between items-center cursor-pointer group">
+                                <button
+                                    onClick={() => { navigate('/settings'); setIsDrawerOpen(false); }}
+                                    className="w-full flex justify-between items-center cursor-pointer group"
+                                >
                                     <span className="font-medium text-gray-900 text-sm group-hover:underline">Settings & Support</span>
                                     <Icon icon="ph:caret-down-bold" className="text-gray-500" width="16" height="16" />
-                                </div>
+                                </button>
                             </div>
                         </div>
                     )}
 
                     {/* Footer */}
-                    <div className="mt-auto p-4 border-t border-gray-100 flex justify-between items-center">
-                        <Icon icon="ph:moon-bold" className="text-nsp-dark-teal cursor-pointer" width="24" height="24" />
-                    </div>
                 </div>
             </div>
+
+            <CreatePostModal
+                isOpen={isPostModalOpen}
+                onClose={() => setIsPostModalOpen(false)}
+                currentUser={currentUser}
+            />
 
         </div>
     );

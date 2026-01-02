@@ -1,0 +1,178 @@
+[
+  {
+    "id": "08027275305",
+    "firstName": "Emmanuel",
+    "surname": "Okpanachi",
+    "category": "Opens",
+    "state": "Kogi State",
+    "image": "/member images/Emmanuel Okpanachi.jpg"
+  },
+  {
+    "id": "08057240253",
+    "firstName": "Hadiz",
+    "surname": "Adefemi",
+    "category": "Opens",
+    "state": "Ogun State",
+    "image": "/member images/Hadiz Adefemi.jpg"
+  },
+  {
+    "id": "09162734990",
+    "firstName": "Hebrew",
+    "surname": "Sado",
+    "category": "Opens",
+    "state": "EDO ",
+    "image": "/member images/Sado Hebrew.jpg"
+  },
+  {
+    "id": "09043566212",
+    "firstName": "David  Godwin",
+    "surname": "Ojih",
+    "category": "Masters",
+    "state": "Delta",
+    "image": "/member images/Ojih David.jpg"
+  },
+  {
+    "id": "08101551307",
+    "firstName": "David",
+    "surname": "Ikoko",
+    "category": "Opens",
+    "state": "Bayelsa",
+    "image": "/member images/David Ikoko.jpg"
+  },
+  {
+    "id": "08137400393",
+    "firstName": "Joy",
+    "surname": "Nwabuzor",
+    "category": "Opens",
+    "state": "Delta state ",
+    "image": "/member images/Joy Nwabuzor.jpg"
+  },
+  {
+    "id": "09036019273",
+    "firstName": "Jamiu",
+    "surname": "Kareem",
+    "category": "Masters",
+    "state": "Oyo State",
+    "image": "/member images/Jamiu Kareem.jpg"
+  },
+  {
+    "id": "08102933091",
+    "firstName": "Abasido",
+    "surname": "Bassey",
+    "category": "Opens",
+    "state": "Akwa Ibom",
+    "image": "/member images/Abasido Bassey.JPEG"
+  },
+  {
+    "id": "08186433885",
+    "firstName": "Eben",
+    "surname": "Toyeme",
+    "category": "Opens",
+    "state": "Lagos",
+    "image": "/member images/Toyeme Ebenezer.jpg"
+  },
+  {
+    "id": "08074731981",
+    "firstName": "Samuel",
+    "surname": "Nwaogu",
+    "category": "Opens",
+    "state": "Abia",
+    "image": "/member images/Samuel Nwaogu.jpg"
+  },
+  {
+    "id": "08156455257",
+    "firstName": "Oghenefejiro",
+    "surname": "Uduvwotayinre",
+    "category": "Opens",
+    "state": "DELTA STATE",
+    "image": "/member images/Uduvwotayinre Oghenefejiro.jpg"
+  },
+  {
+    "id": "09090100425",
+    "firstName": "Victor",
+    "surname": "Ukpe",
+    "category": "Intermediate",
+    "state": "Akwa Ibom ",
+    "image": "/member images/Ukpe Victor.jpg"
+  },
+  {
+    "id": "08141887838",
+    "firstName": "Damilola",
+    "surname": "Adeleke",
+    "category": "Opens",
+    "state": "Osun",
+    "image": "/member images/Adeleke Damilola.jpg"
+  },
+  {
+    "id": "09156447765",
+    "firstName": "Obinnaya Emmanuel",
+    "surname": "Njikonye",
+    "category": "Opens",
+    "state": "Abia",
+    "image": "/member images/Emmanuel Njikonye.jpg"
+  },
+  {
+    "id": "08101964835",
+    "firstName": "Joseph",
+    "surname": "Okere",
+    "category": "Masters",
+    "state": "Edo state",
+    "image": "/member images/Joseph Okere.jpg"
+  },
+  {
+    "id": "09072060469",
+    "firstName": "Fatimah",
+    "surname": "Owolarafe",
+    "category": "Opens",
+    "state": "Kwara ",
+    "image": "/member images/Fatimah Owolarafe.jpg"
+  },
+  {
+    "id": "07012123857",
+    "firstName": "Musa",
+    "surname": "Sulaimon",
+    "category": "Opens",
+    "state": "Kogi ",
+    "image": "https://drive.google.com/thumbnail?id=1x8eil11Yh0PuIruTUhl-lV2FVkGWMOtr&sz=w400"
+  },
+  {
+    "id": "09041768585",
+    "firstName": "Oluwadamilola",
+    "surname": "Chukura",
+    "category": "Opens",
+    "state": "Delta state",
+    "image": "/member images/Oluwadamilola Chukura.jpg"
+  },
+  {
+    "id": "09065728333",
+    "firstName": "Mosope",
+    "surname": "Muyiwa",
+    "category": "Intermediate",
+    "state": "Osun",
+    "image": "/member images/Mosope Muyiwa.PNG"
+  },
+  {
+    "id": "9134377569",
+    "firstName": "Nimotallahi",
+    "surname": "Odeniyi",
+    "category": "Opens",
+    "state": "OSUN STATE",
+    "image": "/member images/Odeniyi Nimotallahi.jpg"
+  },
+  {
+    "id": "09128899844",
+    "firstName": "Aliu",
+    "surname": "Abdulqudus",
+    "category": "Intermediate",
+    "state": "Kwara",
+    "image": "/member images/Aliu Abdulqudus.jpeg"
+  },
+  {
+    "id": "07034006747",
+    "firstName": "Kanyinsola",
+    "surname": "Lasaki",
+    "category": "Opens",
+    "state": "Ogun State",
+    "image": "/member images/Kanyinsola Lasaki.jpeg"
+  }
+]

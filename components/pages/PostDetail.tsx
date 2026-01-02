@@ -7,7 +7,10 @@ import CommentThread from '../Social/CommentThread';
 import CreatePost from '../Social/CreatePost';
 import { Post, Comment } from '../../types';
 import { useCurrentUser } from '../../hooks/useCurrentUser';
-import { getPostById, getComments, likePost, unlikePost, createReRack } from '../../services/postService';
+import { useToast } from '../../contexts/ToastContext';
+import SkeletonPost from '../Loaders/SkeletonPost';
+import { getPostById, getComments, likePost, unlikePost, createReRack, createComment, deletePost } from '../../services/postService';
+import { getAvatarUrl } from '../../utils/userUtils';
 
 const PostDetailContent: React.FC<{
     currentUser: any;
@@ -19,6 +22,7 @@ const PostDetailContent: React.FC<{
     onReply: (postId: string, content: string) => void;
     onReRack: (postId: string, type: 'simple' | 'quote', quoteText?: string) => void;
     onCommentReply: (commentId: string, content: string) => void;
+    onDelete: (postId: string) => void;
 }> = ({
     currentUser,
     post,
@@ -28,17 +32,17 @@ const PostDetailContent: React.FC<{
     onLike,
     onReply,
     onReRack,
-    onCommentReply
+    onCommentReply,
+    onDelete
 }) => {
         const navigate = useNavigate();
         const { openDrawer } = useSocialLayout();
 
         if (isLoading) {
             return (
-                <div className="flex items-center justify-center py-20">
-                    <div className="text-center">
-                        <Icon icon="line-md:loading-twotone-loop" width="48" height="48" className="text-nsp-teal mx-auto mb-4" />
-                        <p className="text-gray-500">Loading post...</p>
+                <div className="bg-white min-h-screen pt-16 md:pt-[72px]">
+                    <div className="max-w-2xl mx-auto">
+                        <SkeletonPost />
                     </div>
                 </div>
             );
@@ -87,6 +91,7 @@ const PostDetailContent: React.FC<{
                         onLike={onLike}
                         onReply={onReply}
                         onReRack={onReRack}
+                        onDelete={onDelete}
                         isDetailView={true} // We might want to add this prop to PostCard to style it slightly differently (larger text etc)
                     />
                 </div>
@@ -94,10 +99,32 @@ const PostDetailContent: React.FC<{
                 {/* Reply Input Area */}
                 <div className="border-b border-gray-100 px-4 py-3">
                     <div className="flex gap-3">
-                        <img src={currentUser?.avatar || '/default-avatar.png'} className="w-10 h-10 rounded-full object-cover" />
+                        <img src={getAvatarUrl(currentUser)} className="w-10 h-10 rounded-full object-cover" />
                         <div className="flex-1">
-                            <p className="text-gray-500 pt-2">Reply to @{post.user.handle}...</p>
-                            {/* We can reuse CreatePost or a simplified version here */}
+                            <textarea
+                                className="w-full bg-transparent text-lg placeholder-gray-500 focus:outline-none resize-none"
+                                placeholder={`Reply to @${post.user.handle || 'user'}...`}
+                                rows={2}
+                                id="post-detail-reply-input"
+                            />
+                            <div className="flex justify-between items-center mt-2">
+                                <div className="flex text-nsp-teal gap-2">
+                                    <Icon icon="ph:image" width="24" height="24" className="cursor-pointer hover:bg-nsp-teal/10 rounded-full p-1" />
+                                    <Icon icon="ph:gif" width="24" height="24" className="cursor-pointer hover:bg-nsp-teal/10 rounded-full p-1" />
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        const input = document.getElementById('post-detail-reply-input') as HTMLTextAreaElement;
+                                        if (input && input.value.trim()) {
+                                            onReply(post.id, input.value);
+                                            input.value = '';
+                                        }
+                                    }}
+                                    className="px-4 py-1.5 bg-nsp-teal text-white font-bold rounded-full text-sm hover:bg-nsp-dark-teal transition-colors"
+                                >
+                                    Reply
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -115,6 +142,8 @@ const PostDetailContent: React.FC<{
     }
 
 const PostDetail: React.FC = () => {
+    const navigate = useNavigate();
+    const { addToast } = useToast();
     const { postId } = useParams<{ postId: string }>();
     const { profile: currentUser, loading: userLoading } = useCurrentUser();
     const [post, setPost] = useState<Post | null>(null);
@@ -174,9 +203,20 @@ const PostDetail: React.FC = () => {
         }
     };
 
-    const handleReply = (id: string, content: string) => {
-        console.log('Reply to post', id, content);
-        // Implement actual reply logic
+    const handleReply = async (id: string, content: string) => {
+        if (!currentUser) return;
+        try {
+            await createComment(id, currentUser.id, content);
+            addToast('success', 'Reply sent');
+            // Reload comments
+            const fetchedComments = await getComments(id);
+            setComments(fetchedComments);
+            // Update counts 
+            setPost(prev => prev ? ({ ...prev, comments_count: prev.comments_count + 1 }) : null);
+        } catch (err) {
+            console.error('Failed to reply:', err);
+            addToast('error', 'Failed to send reply');
+        }
     };
 
     const handleReRack = async (id: string, type: 'simple' | 'quote', quoteText?: string) => {
@@ -184,14 +224,39 @@ const PostDetail: React.FC = () => {
         try {
             await createReRack(id, currentUser.id, quoteText);
             setPost(prev => prev ? ({ ...prev, reracks_count: prev.reracks_count + 1 }) : null);
+            addToast('success', 'Post re-racked!');
         } catch (err) {
             console.error('Error reracking:', err);
+            addToast('error', 'Failed to re-rack');
         }
     };
 
-    const handleCommentReply = (commentId: string, content: string) => {
-        console.log('Reply to comment', commentId, content);
-        // Implement comment reply logic
+    const handleCommentReply = async (commentId: string, content: string) => {
+        if (!currentUser || !post) return;
+        try {
+            await createComment(post.id, currentUser.id, content, commentId);
+            addToast('success', 'Reply sent');
+            // Reload comments
+            const fetchedComments = await getComments(post.id);
+            setComments(fetchedComments);
+            // Update counts
+            setPost(prev => prev ? ({ ...prev, comments_count: prev.comments_count + 1 }) : null);
+        } catch (err) {
+            console.error('Failed to reply to comment:', err);
+            addToast('error', 'Failed to send reply');
+        }
+    };
+
+    const handleDelete = async (postId: string) => {
+        if (!currentUser) return;
+        try {
+            await deletePost(postId, currentUser.id);
+            addToast('success', 'Post deleted');
+            navigate(-1); // Go back
+        } catch (err: any) {
+            console.error('Failed to delete post:', err);
+            addToast('error', 'Failed to delete post: ' + (err.message || 'Unknown error'));
+        }
     };
 
     if (!userLoading && !currentUser) return null; // Or unauthorized view
@@ -208,6 +273,7 @@ const PostDetail: React.FC = () => {
                 onReply={handleReply}
                 onReRack={handleReRack}
                 onCommentReply={handleCommentReply}
+                onDelete={handleDelete}
             />
         </SocialLayout>
     );

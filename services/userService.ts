@@ -191,3 +191,19 @@ export const getFollowing = async (userId: string): Promise<User[]> => {
   // Extract the user objects from the nested structure
   return (data || []).map(item => item.following).filter(Boolean)
 }
+
+/**
+ * Search users by name or handle
+ */
+export const searchUsers = async (query: string): Promise<User[]> => {
+  if (!query.trim()) return [];
+
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .or(`name.ilike.%${query}%,handle.ilike.%${query}%`)
+    .limit(10);
+
+  if (error) throw error;
+  return data || [];
+}

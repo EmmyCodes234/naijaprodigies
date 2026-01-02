@@ -7,6 +7,9 @@ import { renderContentWithLinks } from '../../utils/textParsing.tsx';
 import { formatRelativeTime } from '../../utils/dateUtils';
 import { getComments, createComment, subscribeToComments } from '../../services/postService';
 import CommentThread from './CommentThread';
+import { useToast } from '../../contexts/ToastContext';
+import ConfirmationModal from '../Modals/ConfirmationModal';
+import { getAvatarUrl } from '../../utils/userUtils';
 
 interface PostCardProps {
   post: Post;
@@ -14,11 +17,13 @@ interface PostCardProps {
   onLike: (id: string) => void;
   onReply: (postId: string, content: string) => void;
   onReRack?: (postId: string, type: 'simple' | 'quote', quoteText?: string) => void;
+  onDelete?: (postId: string) => void;
   isDetailView?: boolean;
 }
 
-const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onReply, onReRack, isDetailView = false }) => {
+const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onReply, onReRack, onDelete, isDetailView = false }) => {
   const navigate = useNavigate();
+  const { addToast } = useToast();
   const [analyzing, setAnalyzing] = useState(false);
   const [aiComment, setAiComment] = useState<string | null>(post.aiCommentary || null);
   const [isReplying, setIsReplying] = useState(false);
@@ -30,13 +35,30 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onReply,
   const [showQuoteModal, setShowQuoteModal] = useState(false);
   const [quoteText, setQuoteText] = useState('');
 
-  // Load comments when user clicks to view them
-  useEffect(() => {
-    if (showComments && comments.length === 0) {
-      loadComments();
-    }
-  }, [showComments]);
+  const [showMenu, setShowMenu] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
+  // Close menus when clicking outside
+  useEffect(() => {
+    const closeMenus = () => {
+      setShowMenu(false);
+      setShowReRackMenu(false);
+    }
+    document.addEventListener('click', closeMenus);
+    return () => document.removeEventListener('click', closeMenus);
+  }, []);
+
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowMenu(false);
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (onDelete) {
+      onDelete(post.id);
+    }
+  };
   // Subscribe to real-time comment updates for this specific post
   useEffect(() => {
     const unsubscribe = subscribeToComments(
@@ -96,23 +118,26 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onReply,
     if (!replyText.trim()) return;
 
     try {
-      await createComment(post.id, currentUser.id, replyText);
+      // Use the prop instead of direct call
+      await onReply(post.id, replyText);
       setReplyText('');
       setIsReplying(false);
       setShowComments(true); // Show comments after posting
     } catch (error) {
       console.error('Failed to create comment:', error);
-      alert('Failed to post comment. Please try again.');
+      // addToast handled by parent usually, but if parent throws we can catch here? 
+      // Actually parent should handle toast.
     }
   };
 
   const handleCommentReply = async (parentCommentId: string, content: string) => {
     try {
       await createComment(post.id, currentUser.id, content, parentCommentId);
+      addToast('success', 'Reply sent');
       // The real-time subscription will handle updating the UI
     } catch (error) {
       console.error('Failed to create reply:', error);
-      alert('Failed to post reply. Please try again.');
+      addToast('error', 'Failed to post reply');
     }
   };
 
@@ -201,7 +226,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onReply,
             onClick={(e) => handleUserClick(e, post.user.id)}
           >
             <img
-              src={post.user?.avatar || '/default-avatar.png'}
+              src={getAvatarUrl(post.user)}
               alt={post.user?.name || 'Unknown User'}
               className="w-10 h-10 rounded-full object-cover"
             />
@@ -236,9 +261,40 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onReply,
               <span className="text-gray-500">·</span>
               <span className="text-gray-500 hover:underline">{formatRelativeTime(post.created_at)}</span>
             </div>
-            <button className="text-gray-400 hover:text-nsp-teal p-1 rounded-full hover:bg-nsp-teal/10 transition-colors">
-              <Icon icon="ph:dots-three-bold" />
-            </button>
+
+            <div className="relative">
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
+                className="text-gray-400 hover:text-nsp-teal p-1 rounded-full hover:bg-nsp-teal/10 transition-colors"
+              >
+                <Icon icon="ph:dots-three-bold" />
+              </button>
+
+              {showMenu && (
+                <div
+                  className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-20"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {currentUser.id === post.user_id ? (
+                    <button
+                      onClick={handleDeleteClick}
+                      className="w-full px-4 py-2 text-left text-red-500 hover:bg-red-50 flex items-center gap-2 transition-colors"
+                    >
+                      <Icon icon="ph:trash" width="16" height="16" />
+                      <span className="text-sm font-medium">Delete Post</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => { setShowMenu(false); alert('Report logic to be implemented'); }}
+                      className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
+                    >
+                      <Icon icon="ph:flag" width="16" height="16" />
+                      <span className="text-sm font-medium">Report Post</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Text Body - Quote Text for Quote Re-Racks */}
@@ -253,7 +309,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onReply,
             <div className="mt-2 mb-3 border border-gray-200 rounded-2xl p-3 hover:bg-gray-50 transition-colors">
               <div className="flex gap-2">
                 <img
-                  src={post.original_post.user?.avatar || '/default-avatar.png'}
+                  src={getAvatarUrl(post.original_post.user)}
                   alt={post.original_post.user?.name || 'Unknown User'}
                   className="w-8 h-8 rounded-full object-cover cursor-pointer"
                   onClick={(e) => post.original_post?.user && handleUserClick(e, post.original_post.user.id)}
@@ -408,7 +464,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onReply,
               {/* Reply Input Area */}
               <div className="pt-3 border-t border-gray-100">
                 <div className="flex gap-3">
-                  <img src={currentUser.avatar || '/default-avatar.png'} className="w-8 h-8 rounded-full object-cover" />
+                  <img src={getAvatarUrl(currentUser)} className="w-8 h-8 rounded-full object-cover" />
                   <div className="flex-1">
                     <textarea
                       className="w-full bg-gray-50 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-nsp-teal/20 text-gray-900 placeholder-gray-500 resize-none"
@@ -493,7 +549,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onReply,
             <div className="border border-gray-200 rounded-xl p-4 mb-4">
               <div className="flex gap-3">
                 <img
-                  src={post.user?.avatar || '/default-avatar.png'}
+                  src={getAvatarUrl(post.user)}
                   alt={post.user?.name || 'Unknown User'}
                   className="w-8 h-8 rounded-full object-cover"
                 />
@@ -533,6 +589,15 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onReply,
           </div>
         </div>
       )}
+      <ConfirmationModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleConfirmDelete}
+        title="Delete Post?"
+        message="Are you sure you want to delete this post? This action cannot be undone."
+        confirmLabel="Delete"
+        isDestructive={true}
+      />
     </article>
   );
 };
