@@ -34,13 +34,13 @@ const GistDiscovery: React.FC<GistDiscoveryProps> = ({ variant = 'vertical' }) =
     // Horizontal Variant (Feed Header - Spaces Style)
     if (variant === 'horizontal') {
         return (
-            <div className="w-full overflow-x-auto no-scrollbar py-4 px-4 border-b border-gray-100 bg-white">
+            <div className="w-full overflow-x-auto no-scrollbar py-4 px-4 border-b border-gray-100 bg-white snap-x snap-mandatory">
                 <div className="flex items-center gap-4 min-w-min">
                     {/* Live Gists */}
                     {liveGists.map((gist) => (
                         <div
                             key={gist.id}
-                            className="flex flex-col items-center gap-2 cursor-pointer group min-w-[72px]"
+                            className="flex flex-col items-center gap-2 cursor-pointer group min-w-[72px] snap-center"
                             onClick={() => joinGist(gist.id)}
                         >
                             <div className="relative p-[3px] rounded-full border-2 border-nsp-purple animate-pulse">
@@ -60,7 +60,7 @@ const GistDiscovery: React.FC<GistDiscoveryProps> = ({ variant = 'vertical' }) =
 
                     {/* Scheduled Gists */}
                     {scheduledGists.map((gist) => (
-                        <div key={gist.id} className="flex flex-col items-center gap-2 cursor-default min-w-[72px] opacity-70">
+                        <div key={gist.id} className="flex flex-col items-center gap-2 cursor-default min-w-[72px] opacity-70 snap-center">
                             <div className="relative p-[3px] rounded-full border-2 border-gray-200">
                                 <Avatar
                                     user={gist.host}
