@@ -1,3 +1,4 @@
+import React from 'react';
 import { Icon } from '@iconify/react';
 import ImageViewer from './Shared/ImageViewer';
 

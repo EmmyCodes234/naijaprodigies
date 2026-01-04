@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { QueryProvider } from './src/providers/QueryProvider';
 import { supabase } from './services/supabaseClient';
 import Navbar from './components/Navbar';
 import Home from './components/pages/Home';
@@ -171,14 +172,16 @@ const App: React.FC = () => {
   return (
     <Router>
       <AuthProvider>
-        <ToastProvider>
-          <NotificationProvider>
-            <GistProvider>
-              <ScrollToTop />
-              <AppContent />
-            </GistProvider>
-          </NotificationProvider>
-        </ToastProvider>
+        <QueryProvider>
+          <ToastProvider>
+            <NotificationProvider>
+              <GistProvider>
+                <ScrollToTop />
+                <AppContent />
+              </GistProvider>
+            </NotificationProvider>
+          </ToastProvider>
+        </QueryProvider>
       </AuthProvider>
     </Router>
   );

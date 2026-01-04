@@ -4,15 +4,14 @@ import { Icon } from '@iconify/react';
 import { useNavigate } from 'react-router-dom';
 import PostCard from '../Social/PostCard';
 import CreatePost from '../Social/CreatePost';
-import SearchBar from '../SearchBar';
 import { Post } from '../../types';
 import { useCurrentUser } from '../../hooks/useCurrentUser';
 import { getPosts, subscribeToNewPosts, subscribeToLikes, subscribeToReRacks, subscribeToComments, likePost, unlikePost, createReRack, deletePost, createComment } from '../../services/postService';
 import SkeletonPost from '../Loaders/SkeletonPost';
 import { useToast } from '../../contexts/ToastContext';
-import { getAvatarUrl } from '../../utils/userUtils';
 import Avatar from '../Shared/Avatar';
 import GistDiscovery from '../Gist/GistDiscovery';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 const POSTS_PER_PAGE = 20;
 
@@ -22,7 +21,7 @@ const SocialFeedContent: React.FC<{
   isLoadingPosts: boolean;
   isLoadingMore: boolean;
   hasMore: boolean;
-  error: string | null;
+  error: any;
   feedType: 'for-you' | 'following';
   setFeedType: (type: 'for-you' | 'following') => void;
   observerTarget: React.RefObject<HTMLDivElement>;
@@ -50,13 +49,10 @@ const SocialFeedContent: React.FC<{
     const { openDrawer } = useSocialLayout();
     const navigate = useNavigate();
 
-
-
-    // Show loading state
-    if (isLoadingPosts) {
+    // Show loading state (initial load only)
+    if (isLoadingPosts && posts.length === 0) {
       return (
         <div>
-          {/* Render 5 skeletons */}
           {[...Array(5)].map((_, i) => (
             <SkeletonPost key={i} />
           ))}
@@ -65,12 +61,14 @@ const SocialFeedContent: React.FC<{
     }
 
     // Show error state
-    if (error) {
+    if (error && posts.length === 0) {
       return (
         <div className="flex items-center justify-center py-20">
           <div className="text-center">
             <Icon icon="ph:warning-circle" width="48" height="48" className="text-red-500 mx-auto mb-4" />
-            <p className="text-red-500 mb-4">{error}</p>
+            <p className="text-red-500 mb-4">
+              {error instanceof Error ? error.message : 'Failed to load posts'}
+            </p>
             <button
               onClick={() => window.location.reload()}
               className="px-6 py-2 bg-nsp-teal text-white rounded-full hover:bg-nsp-dark-teal transition-colors"
@@ -84,7 +82,6 @@ const SocialFeedContent: React.FC<{
 
     return (
       <>
-        {/* Sticky Header with Tabs */}
         {/* Sticky Header with Tabs */}
         <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-gray-100 transition-all duration-200">
           <div className="px-4 py-3 flex items-center gap-4 md:hidden">
@@ -144,8 +141,6 @@ const SocialFeedContent: React.FC<{
           <CreatePost currentUser={currentUser} onPost={onCreatePost} />
         </div>
 
-
-
         {/* Posts Stream */}
         <div>
           {posts.length === 0 && !isLoadingPosts ? (
@@ -200,302 +195,308 @@ const SocialFeedContent: React.FC<{
   };
 
 const SocialFeed: React.FC = () => {
-  const navigate = useNavigate();
   const { profile: currentUser, loading: userLoading } = useCurrentUser();
   const { addToast } = useToast();
   const [feedType, setFeedType] = useState<'for-you' | 'following'>('for-you');
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [isLoadingPosts, setIsLoadingPosts] = useState(true);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [offset, setOffset] = useState(0);
+  const queryClient = useQueryClient();
   const observerTarget = useRef<HTMLDivElement>(null);
 
-  // Fetch initial posts from Supabase
-  useEffect(() => {
-    const fetchPosts = async () => {
-      try {
-        setIsLoadingPosts(true);
-        // Reset posts when switching feeds
-        setPosts([]);
+  // React Query: Infinite Posts Fetch
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+    error,
+  } = useInfiniteQuery({
+    queryKey: ['posts', feedType, currentUser?.id],
+    queryFn: ({ pageParam = 0 }) => getPosts(POSTS_PER_PAGE, pageParam, currentUser?.id, feedType),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      // If the last page has fewer items than requested, we've reached the end
+      if (lastPage.length < POSTS_PER_PAGE) return undefined;
+      // Next offset is the total number of items loaded so far
+      return allPages.flat().length;
+    },
+    enabled: !!currentUser, // Only fetch when user is loaded
+    staleTime: 1000 * 60 * 5, // Consider data fresh for 5 minutes
+  });
 
-        const fetchedPosts = await getPosts(POSTS_PER_PAGE, 0, currentUser?.id, feedType);
-        setPosts(fetchedPosts);
-        setOffset(POSTS_PER_PAGE);
-        setHasMore(fetchedPosts.length === POSTS_PER_PAGE);
-        setError(null);
-      } catch (err) {
-        console.error('Error fetching posts:', err);
-        setError('Failed to load posts');
-      } finally {
-        setIsLoadingPosts(false);
-      }
-    };
+  // Flatten pages into a single array of posts
+  const posts = data?.pages.flat() || [];
 
-    if (currentUser) {
-      fetchPosts();
-    }
-  }, [currentUser, feedType]); // Re-run when feedType changes
-
-  // Subscribe to real-time post updates
-  useEffect(() => {
-    const unsubscribe = subscribeToNewPosts(
-      (newPost) => {
-        setPosts((prevPosts) => {
-          const exists = prevPosts.some(p => p.id === newPost.id);
-          if (exists) return prevPosts;
-          return [newPost, ...prevPosts];
-        });
-      },
-      (error) => {
-        console.error('Real-time subscription error:', error);
-      }
-    );
-    return () => unsubscribe();
-  }, []);
-
-  // Subscribe to real-time like updates
-  useEffect(() => {
-    if (!currentUser) return;
-    const unsubscribe = subscribeToLikes(
-      (postId, userId, isLike) => {
-        setPosts((prevPosts) =>
-          prevPosts.map((post) => {
-            if (post.id === postId) {
-              return {
-                ...post,
-                likes_count: isLike ? post.likes_count + 1 : post.likes_count - 1,
-                is_liked_by_current_user: userId === currentUser.id ? isLike : post.is_liked_by_current_user
-              };
-            }
-            return post;
-          })
-        );
-      },
-      (error) => console.error(error)
-    );
-    return () => unsubscribe();
-  }, [currentUser]);
-
-  // Subscribe to real-time re-rack updates
-  useEffect(() => {
-    const unsubscribe = subscribeToReRacks(
-      (originalPostId) => {
-        setPosts((prevPosts) =>
-          prevPosts.map((post) => {
-            if (post.id === originalPostId) {
-              return {
-                ...post,
-                reracks_count: post.reracks_count + 1
-              };
-            }
-            return post;
-          })
-        );
-      },
-      (error) => console.error(error)
-    );
-    return () => unsubscribe();
-  }, []);
-
-  // Subscribe to real-time comment updates
-  useEffect(() => {
-    const unsubscribe = subscribeToComments(
-      (newComment) => {
-        setPosts((prevPosts) =>
-          prevPosts.map((post) => {
-            if (post.id === newComment.post_id) {
-              return {
-                ...post,
-                comments_count: post.comments_count + 1
-              };
-            }
-            return post;
-          })
-        );
-      },
-      (error) => console.error(error)
-    );
-    return () => unsubscribe();
-  }, []);
-
-  // Load more posts for infinite scroll
-  const loadMorePosts = useCallback(async () => {
-    if (isLoadingMore || !hasMore) return;
-
-    try {
-      setIsLoadingMore(true);
-      const newPosts = await getPosts(POSTS_PER_PAGE, offset, currentUser?.id, feedType);
-
-      // Prevent duplicate posts by filtering out any posts that already exist
-      const existingPostIds = new Set(posts.map(p => p.id));
-      const uniqueNewPosts = newPosts.filter(p => !existingPostIds.has(p.id));
-
-      setPosts(prevPosts => [...prevPosts, ...uniqueNewPosts]);
-      setOffset(prevOffset => prevOffset + POSTS_PER_PAGE);
-      setHasMore(newPosts.length === POSTS_PER_PAGE);
-    } catch (err) {
-      console.error('Error loading more posts:', err);
-    } finally {
-      setIsLoadingMore(false);
-    }
-  }, [isLoadingMore, hasMore, offset, posts, currentUser, feedType]);
-
-  // Intersection Observer
+  // Infinite Scroll Observer
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMore && !isLoadingMore) {
-          loadMorePosts();
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
         }
       },
       { threshold: 0.1 }
     );
     if (observerTarget.current) observer.observe(observerTarget.current);
     return () => { if (observerTarget.current) observer.unobserve(observerTarget.current); };
-  }, [hasMore, isLoadingMore, loadMorePosts]);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  const handleCreatePost = (newPost: Post) => {
-    // Optimistic UI update - add post immediately
-    setPosts((prevPosts) => {
-      const exists = prevPosts.some(p => p.id === newPost.id);
-      if (exists) return prevPosts;
-      return [newPost, ...prevPosts];
-    });
-  };
-
-  const handleLike = async (postId: string) => {
+  // Realtime Subscriptions (Updates Cache Directly)
+  useEffect(() => {
     if (!currentUser) return;
 
-    // Find the post to determine current like state
-    const post = posts.find(p => p.id === postId);
-    if (!post) return;
+    // Helper to update posts in cache
+    const updateCache = (updater: (oldPosts: Post[]) => Post[]) => {
+      queryClient.setQueryData(['posts', feedType, currentUser.id], (oldData: any) => {
+        if (!oldData) return oldData;
+        return {
+          ...oldData,
+          pages: oldData.pages.map((page: Post[], index: number) => {
+            if (index === 0) {
+              // For new posts, we only might add to the first page.
+              // But the updater function logic here is simplifying assuming flat array.
+              // Infinite query structure is complex (pages array).
+              // We will map over all pages.
+              return updater(page); // This logic needs to be careful not to duplicate or mess order.
+            }
+            return updater(page);
+          }),
+        };
+      });
+      // A safer approach for list updates is usually to invalidate, but that causes refetch.
+      // For mutations like 'like', we can iterate all pages.
+    };
 
-    const isCurrentlyLiked = post.is_liked_by_current_user;
+    const unsubscribeNewPosts = subscribeToNewPosts(
+      (newPost) => {
+        queryClient.setQueryData(['posts', feedType, currentUser.id], (oldData: any) => {
+          if (!oldData) return { pages: [[newPost]], pageParams: [0] };
+          const firstPage = oldData.pages[0];
+          // Check if exists
+          if (firstPage.some((p: Post) => p.id === newPost.id)) return oldData;
 
-    // Optimistic UI update
-    setPosts((prevPosts) =>
-      prevPosts.map((p) => {
-        if (p.id === postId) {
+          // Prepend to first page
+          const newFirstPage = [newPost, ...firstPage];
           return {
-            ...p,
-            likes_count: isCurrentlyLiked ? p.likes_count - 1 : p.likes_count + 1,
-            is_liked_by_current_user: !isCurrentlyLiked
+            ...oldData,
+            pages: [newFirstPage, ...oldData.pages.slice(1)]
           };
-        }
-        return p;
-      })
+        });
+      },
+      (err) => console.error(err)
     );
 
-    try {
-      // Call the appropriate service method
+    const unsubscribeLikes = subscribeToLikes(
+      (postId, userId, isLike) => {
+        queryClient.setQueryData(['posts', feedType, currentUser.id], (oldData: any) => {
+          if (!oldData) return oldData;
+          return {
+            ...oldData,
+            pages: oldData.pages.map((page: Post[]) =>
+              page.map(post => {
+                if (post.id === postId) {
+                  return {
+                    ...post,
+                    likes_count: isLike ? post.likes_count + 1 : post.likes_count - 1,
+                    is_liked_by_current_user: userId === currentUser.id ? isLike : post.is_liked_by_current_user
+                  };
+                }
+                return post;
+              })
+            )
+          };
+        });
+      },
+      (err) => console.error(err)
+    );
+
+    const unsubscribeComments = subscribeToComments(
+      (newComment) => {
+        queryClient.setQueryData(['posts', feedType, currentUser.id], (oldData: any) => {
+          if (!oldData) return oldData;
+          return {
+            ...oldData,
+            pages: oldData.pages.map((page: Post[]) =>
+              page.map(post => {
+                if (post.id === newComment.post_id) {
+                  return { ...post, comments_count: post.comments_count + 1 };
+                }
+                return post;
+              })
+            )
+          };
+        });
+      },
+      (err) => console.error(err)
+    );
+
+    const unsubscribeReRacks = subscribeToReRacks(
+      (originalPostId) => {
+        queryClient.setQueryData(['posts', feedType, currentUser.id], (oldData: any) => {
+          if (!oldData) return oldData;
+          return {
+            ...oldData,
+            pages: oldData.pages.map((page: Post[]) =>
+              page.map(post => {
+                if (post.id === originalPostId) {
+                  return { ...post, reracks_count: post.reracks_count + 1 };
+                }
+                return post;
+              })
+            )
+          };
+        });
+      },
+      (err) => console.error(err)
+    );
+
+    return () => {
+      unsubscribeNewPosts();
+      unsubscribeLikes();
+      unsubscribeComments();
+      unsubscribeReRacks();
+    };
+  }, [currentUser, queryClient, feedType]);
+
+
+  // Mutations
+  const createPostMutation = useMutation({
+    mutationFn: (post: Post) => Promise.resolve(post), // The act of creating is handled in CreatePost component, here we just receive the result
+    onSuccess: (newPost) => {
+      // Manually update cache if subscription is slow, or handled by subscription?
+      // Let's rely on manual update for instant feel, deduplicated by subscription logic
+      queryClient.setQueryData(['posts', feedType, currentUser?.id], (oldData: any) => {
+        if (!oldData) return { pages: [[newPost]], pageParams: [0] };
+        const firstPage = oldData.pages[0];
+        if (firstPage.some((p: Post) => p.id === newPost.id)) return oldData;
+        return {
+          ...oldData,
+          pages: [[newPost, ...firstPage], ...oldData.pages.slice(1)]
+        };
+      });
+    }
+  });
+
+  const likeMutation = useMutation({
+    mutationFn: async ({ postId, isCurrentlyLiked }: { postId: string, isCurrentlyLiked: boolean }) => {
+      if (!currentUser) throw new Error("No user");
       if (isCurrentlyLiked) {
         await unlikePost(postId, currentUser.id);
       } else {
         await likePost(postId, currentUser.id);
       }
-    } catch (error) {
-      console.error('Error toggling like:', error);
+    },
+    onMutate: async ({ postId, isCurrentlyLiked }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['posts', feedType, currentUser?.id] });
+      const previousData = queryClient.getQueryData(['posts', feedType, currentUser?.id]);
 
-      // Rollback optimistic update on error
-      setPosts((prevPosts) =>
-        prevPosts.map((p) => {
-          if (p.id === postId) {
-            return {
-              ...p,
-              likes_count: isCurrentlyLiked ? p.likes_count + 1 : p.likes_count - 1,
-              is_liked_by_current_user: isCurrentlyLiked
-            };
-          }
-          return p;
-        })
-      );
+      // Optimistically update
+      queryClient.setQueryData(['posts', feedType, currentUser?.id], (oldData: any) => {
+        if (!oldData) return oldData;
+        return {
+          ...oldData,
+          pages: oldData.pages.map((page: Post[]) =>
+            page.map(post => {
+              if (post.id === postId) {
+                return {
+                  ...post,
+                  likes_count: isCurrentlyLiked ? post.likes_count - 1 : post.likes_count + 1,
+                  is_liked_by_current_user: !isCurrentlyLiked
+                };
+              }
+              return post;
+            })
+          )
+        };
+      });
+
+      return { previousData };
+    },
+    onError: (err, newTodo, context) => {
+      queryClient.setQueryData(['posts', feedType, currentUser?.id], context?.previousData);
+      addToast('error', 'Failed to update like');
     }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (postId: string) => {
+      if (!currentUser) throw new Error("No user");
+      await deletePost(postId, currentUser.id);
+    },
+    onMutate: async (postId) => {
+      await queryClient.cancelQueries({ queryKey: ['posts', feedType, currentUser?.id] });
+      const previousData = queryClient.getQueryData(['posts', feedType, currentUser?.id]);
+
+      queryClient.setQueryData(['posts', feedType, currentUser?.id], (oldData: any) => {
+        if (!oldData) return oldData;
+        return {
+          ...oldData,
+          pages: oldData.pages.map((page: Post[]) => page.filter(p => p.id !== postId))
+        };
+      });
+      return { previousData };
+    },
+    onError: (err, postId, context) => {
+      queryClient.setQueryData(['posts', feedType, currentUser?.id], context?.previousData);
+      addToast('error', 'Failed to delete post');
+    },
+    onSuccess: () => {
+      addToast('success', 'Post deleted');
+    }
+  });
+
+  // Handlers
+  const handleCreatePost = (post: Post) => {
+    createPostMutation.mutate(post);
   };
 
+  const handleLike = (postId: string, isCurrentlyLiked: boolean) => {
+    likeMutation.mutate({ postId, isCurrentlyLiked });
+  };
+
+  const handleDelete = (postId: string) => {
+    deleteMutation.mutate(postId);
+  };
+
+  // Reply and ReRack (simplified for now, using legacy pattern or could move to mutation)
+  // Keeping standard callback pattern but ensuring it invalidates or manually updates could help
   const handleReply = useCallback(async (postId: string, content: string, mediaUrl?: string, mediaType?: 'image' | 'video' | 'gif') => {
     if (!currentUser) return;
     try {
       await createComment(postId, currentUser.id, content, undefined, mediaUrl, mediaType);
       addToast('success', 'Reply sent');
-
-      // Optimistically update counts
-      setPosts(prev => prev.map(p =>
-        p.id === postId ? { ...p, comments_count: p.comments_count + 1 } : p
-      ));
-
+      // Optimistic update via subscription or manual?
+      // Subscription handles it usually, but let's do manual for speed
+      /* Logic handled by subscription listener above */
     } catch (error) {
-      console.error('Error in handleReply:', error);
+      console.error(error);
       addToast('error', 'Failed to send reply');
     }
   }, [currentUser, addToast]);
 
   const handleReRack = useCallback(async (postId: string, type: 'simple' | 'quote', quoteText?: string) => {
     if (!currentUser) return;
-
     try {
-      // Create the re-rack
-      const rerackPost = await createReRack(postId, currentUser.id, quoteText);
-
-      // Optimistic UI update - add re-rack to feed
-      setPosts((prevPosts) => {
-        const exists = prevPosts.some(p => p.id === rerackPost.id);
-        if (exists) return prevPosts;
-
-        // Also update the reracks_count of the original post
-        const updatedPosts = prevPosts.map(p => {
-          if (p.id === postId) {
-            return {
-              ...p,
-              reracks_count: p.reracks_count + 1
-            };
-          }
-          return p;
-        });
-
-        return [rerackPost, ...updatedPosts];
-      });
+      const rerack = await createReRack(postId, currentUser.id, quoteText);
+      // Add to feed
+      handleCreatePost(rerack);
     } catch (error) {
-      console.error('Error creating re-rack:', error);
-      throw error; // Re-throw to let the PostCard handle the error display
+      console.error(error);
+      addToast('error', 'Failed to repost');
     }
-  }, [currentUser]);
+  }, [currentUser, handleCreatePost]);
 
-  const handleDelete = useCallback(async (postId: string) => {
-    if (!currentUser) return;
 
-    // Optimistic UI update
-    setPosts(prevPosts => prevPosts.filter(p => p.id !== postId));
-
-    try {
-      await deletePost(postId, currentUser.id);
-      addToast('success', 'Post deleted');
-    } catch (error) {
-      console.error('Error deleting post:', error);
-      // We'd need original posts to rollback perfectly, but re-fetching might be easier or accepting the glitch
-      // For now, let's just toast error
-      addToast('error', 'Failed to delete post');
-      // In a real robust app, we'd undo the filter
-    }
-  }, [currentUser, addToast]);
-
-  // Show auth required state (Layout handles this for sidebar but we might want to be explicit)
-  if (!userLoading && !currentUser) {
-    // You might want to redirect or show a dedicated landing page
-    // But for now, SocialLayout might render empty sidebars, so we should allow it but show a message?
-    // Actually SocialFeed is protected by ProtectedRoute, so this shouldn't happen.
-    return null;
-  }
+  if (!userLoading && !currentUser) return null;
 
   return (
     <SocialLayout>
       <SocialFeedContent
         currentUser={currentUser}
         posts={posts}
-        isLoadingPosts={isLoadingPosts}
-        isLoadingMore={isLoadingMore}
-        hasMore={hasMore}
+        isLoadingPosts={isLoading}
+        isLoadingMore={isFetchingNextPage}
+        hasMore={hasNextPage}
         error={error}
         feedType={feedType}
         setFeedType={setFeedType}

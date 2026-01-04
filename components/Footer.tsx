@@ -18,15 +18,15 @@ const Footer: React.FC = () => {
               Empowering the next generation of Scrabble champions from Nigeria to the global stage. We define strategy, creativity, and excellence.
             </p>
             <div className="flex gap-4">
-              {['ri:facebook-fill', 'ri:twitter-x-fill', 'ri:instagram-fill'].map((iconName, i) => (
-                <a
-                  key={i}
-                  href="#"
-                  className="bg-white/5 p-3 rounded-full hover:bg-nsp-orange hover:text-white transition-all transform hover:-translate-y-1 hover:shadow-lg"
-                >
-                  <Icon icon={iconName} width="20" height="20" />
-                </a>
-              ))}
+              <a
+                href="https://instagram.com/nigerianscrabbleprodigies"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-white/5 p-3 rounded-full hover:bg-nsp-orange hover:text-white transition-all transform hover:-translate-y-1 hover:shadow-lg flex items-center gap-2 pr-4 group"
+              >
+                <Icon icon="ri:instagram-fill" width="20" height="20" />
+                <span className="text-sm font-bold text-gray-300 group-hover:text-white">@nigerianscrabbleprodigies</span>
+              </a>
             </div>
           </div>
 
@@ -59,14 +59,14 @@ const Footer: React.FC = () => {
                 <div className="bg-nsp-teal/20 p-2 rounded-lg text-nsp-teal">
                   <Icon icon="ph:envelope-fill" width="18" height="18" />
                 </div>
-                <span className="mt-1">hello@nsp.ng</span>
+                <span className="mt-1">hello.nsp@gmail.com</span>
               </li>
               <li className="flex items-start gap-4 text-gray-400">
                 <div className="bg-nsp-teal/20 p-2 rounded-lg text-nsp-teal">
                   <Icon icon="ph:map-pin-fill" width="18" height="18" />
                 </div>
                 <span className="mt-1 leading-relaxed">
-                  National Stadium Complex,<br />Surulere, Lagos, Nigeria
+                  Lagos, Nigeria
                 </span>
               </li>
             </ul>
