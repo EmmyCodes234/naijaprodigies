@@ -59,7 +59,7 @@ const InfoSection: React.FC = () => {
           {/* Text Content */}
           <div
             ref={textRef as any}
-            className={`transition-all duration-1000 ease-out transform ${textVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'
+            className={`transition-all duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] transform gpu-accelerate ${textVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'
               }`}
           >
             <h2 className="font-luckiest text-5xl md:text-6xl text-nsp-teal mb-6">
@@ -73,7 +73,7 @@ const InfoSection: React.FC = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div
-                className={`bg-white p-6 rounded-xl shadow-[4px_4px_0px_0px_rgba(15,60,58,1)] border-2 border-nsp-teal transition-all duration-300 hover:-translate-y-2 hover:shadow-[8px_8px_0px_0px_rgba(15,60,58,1)] ${textVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+                className={`bg-white p-6 rounded-xl shadow-[4px_4px_0px_0px_rgba(15,60,58,1)] border-2 border-nsp-teal transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-2 hover:shadow-[8px_8px_0px_0px_rgba(15,60,58,1)] gpu-accelerate ${textVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
                   }`}
                 style={{ transitionDelay: '300ms' }}
               >
@@ -82,7 +82,7 @@ const InfoSection: React.FC = () => {
                 <p className="text-sm text-gray-600 mt-2 leading-snug">Home to Africa Youth Scrabble Champions (AYSC).</p>
               </div>
               <div
-                className={`bg-white p-6 rounded-xl shadow-[4px_4px_0px_0px_rgba(217,58,38,1)] border-2 border-nsp-red transition-all duration-300 hover:-translate-y-2 hover:shadow-[8px_8px_0px_0px_rgba(217,58,38,1)] ${textVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+                className={`bg-white p-6 rounded-xl shadow-[4px_4px_0px_0px_rgba(217,58,38,1)] border-2 border-nsp-red transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-2 hover:shadow-[8px_8px_0px_0px_rgba(217,58,38,1)] gpu-accelerate ${textVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
                   }`}
                 style={{ transitionDelay: '500ms' }}
               >
@@ -96,7 +96,7 @@ const InfoSection: React.FC = () => {
           {/* Visual/Image Placeholder - Parallax applied only on desktop */}
           <div
             ref={imageRef as any}
-            className={`relative will-change-transform transition-all duration-1000 ease-out delay-200 ${imageVisible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-12'
+            className={`relative will-change-transform transition-all duration-[900ms] ease-[cubic-bezier(0.16,1,0.3,1)] delay-200 gpu-accelerate ${imageVisible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-12'
               }`}
             style={{
               transform: isMobile || !imageVisible ? undefined : `translateY(${scrollY * 0.08}px)`
@@ -132,7 +132,7 @@ const InfoSection: React.FC = () => {
           ].map((stat, idx) => (
             <div
               key={idx}
-              className={`text-center group transition-all duration-700 ${statsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'
+              className={`text-center group transition-all duration-[700ms] ease-[cubic-bezier(0.16,1,0.3,1)] gpu-accelerate ${statsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'
                 }`}
               style={{ transitionDelay: `${idx * 150}ms` }}
             >

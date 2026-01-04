@@ -58,6 +58,7 @@ interface GistContextType {
     isDiscoveryCollapsed: boolean;
     toggleDiscoveryCollapse: () => void;
     deleteGist: (gistId: string) => Promise<void>;
+    fetchDiscoveryGists: () => Promise<void>;
 
     // Audio & Recording
     localStream: MediaStream | null;

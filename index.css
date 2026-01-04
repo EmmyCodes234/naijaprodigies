@@ -2,6 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Global Smooth Scroll */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Reduce motion for users who prefer it */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    * {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
 /* Emoji Picker Override */
 .EmojiPickerReact {
   --epr-text-color: #000000 !important;
@@ -31,4 +51,29 @@
 
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Smooth Scroll Animation Utilities */
+@layer utilities {
+  .animate-slide-up-fade {
+    animation: slideUpFadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes slideUpFadeIn {
+    from {
+      opacity: 0;
+      transform: translate3d(0, 40px, 0);
+    }
+
+    to {
+      opacity: 1;
+      transform: translate3d(0, 0, 0);
+    }
+  }
+
+  /* GPU Acceleration Hint */
+  .gpu-accelerate {
+    transform: translate3d(0, 0, 0);
+    will-change: transform, opacity;
+  }
 }

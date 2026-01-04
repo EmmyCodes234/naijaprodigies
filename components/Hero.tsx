@@ -18,27 +18,29 @@ const Hero: React.FC = () => {
           trigger: containerRef.current,
           start: "top top",
           end: "+=200%", // Scroll distance (200vh)
-          scrub: 1,      // Smooth scrubbing
+          scrub: 0.5,      // Smoother scrubbing (reduced from 1)
           pin: true,     // Pin the section
-          anticipatePin: 1
+          anticipatePin: 1,
+          invalidateOnRefresh: true
         }
       });
 
-      // Animation Steps
+      // Animation Steps with improved easing
       tl.to("#hero-text", {
         scale: 10,       // Fly through text
         opacity: 0,
-        ease: "power2.in",
+        ease: "power2.inOut",  // Smoother easing
         duration: 5
       }, 0)
         .to("#road-container", {
           scale: 30,       // Zoom into road
           y: 500,          // Move horizon down slightly
-          ease: "power1.in",
+          ease: "power1.inOut",  // Smoother easing
           duration: 10
         }, 0)
         .to("#hero-bg", {
           opacity: 0,      // Fade out background to white/next section
+          ease: "power2.out",
           duration: 4
         }, 6);
 

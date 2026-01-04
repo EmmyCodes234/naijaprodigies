@@ -21,8 +21,6 @@
     window.process = {
       env: {
         NODE_ENV: 'development',
-        // API_KEY will be injected by the environment if available, 
-        // otherwise safely undefined here
         ...((window.process && window.process.env) || {})
       }
     };

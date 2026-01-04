@@ -92,7 +92,7 @@ const OurStory: React.FC = () => {
             {milestones.map((item, index) => {
               const isEven = index % 2 === 0;
               return (
-                <div key={index} className={`timeline-item flex flex-col md:flex-row items-center w-full opacity-0 translate-y-8 transition-all duration-700 ease-out ${isEven ? 'md:justify-start' : 'md:justify-end'}`}>
+                <div key={index} className={`timeline-item flex flex-col md:flex-row items-center w-full opacity-0 translate-y-8 transition-all duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] gpu-accelerate ${isEven ? 'md:justify-start' : 'md:justify-end'}`}>
 
                   {/* Central Node (Desktop) */}
                   <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center justify-center w-12 h-12 bg-white rounded-full border-4 border-[#f2f0e9] z-20 hidden md:flex shadow-md">
@@ -102,7 +102,7 @@ const OurStory: React.FC = () => {
                   </div>
 
                   {/* Content Card */}
-                  <div className={`w-full md:w-[45%] bg-white p-8 rounded-2xl shadow-lg border-l-4 border-${item.color} hover:shadow-xl transition-all hover:-translate-y-1 relative z-10 group`}>
+                  <div className={`w-full md:w-[45%] bg-white p-8 rounded-2xl shadow-lg border-l-4 border-${item.color} hover:shadow-xl transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-1 relative z-10 group gpu-accelerate`}>
                     <div className={`text-${item.color} font-black text-3xl mb-2 font-luckiest flex items-center gap-3`}>
                       {item.year}
                       {/* Mobile Icon */}
