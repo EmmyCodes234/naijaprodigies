@@ -5,8 +5,6 @@ import { supabase } from './services/supabaseClient';
 import Navbar from './components/Navbar';
 import Home from './components/pages/Home';
 import OurStory from './components/pages/OurStory';
-import Tournaments from './components/pages/Tournaments';
-import Blog from './components/pages/Blog';
 import Members from './components/pages/Members';
 import SocialFeed from './components/pages/SocialFeed';
 import Notifications from './components/pages/Notifications';
@@ -147,8 +145,6 @@ const AppContent: React.FC = () => {
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/cookie-policy" element={<CookiePolicy />} />
           <Route path="/story" element={<OurStory />} />
-          <Route path="/tournaments" element={<Tournaments />} />
-          <Route path="/blog" element={<Blog />} />
           <Route path="/members" element={<Members />} />
         </Routes>
       </main>

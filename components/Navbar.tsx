@@ -31,8 +31,6 @@ const Navbar: React.FC<NavbarProps> = ({ onWizardClick, onAuthClick }) => {
   const links: NavLink[] = [
     { label: 'Feed', href: '/feed' },
     { label: 'Story', href: '/story' },
-    { label: 'Tournaments', href: '/tournaments' },
-    { label: 'Blog', href: '/blog' },
     { label: 'Members', href: '/members' },
   ];
 

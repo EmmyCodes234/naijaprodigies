@@ -1,5 +1,5 @@
-import React from 'react';
 import { Icon } from '@iconify/react';
+import ImageViewer from './Shared/ImageViewer';
 
 export interface MemberData {
   name: string;
@@ -26,6 +26,8 @@ interface MemberProfileModalProps {
 }
 
 const MemberProfileModal: React.FC<MemberProfileModalProps> = ({ member, isOpen, onClose }) => {
+  const [showFullImage, setShowFullImage] = React.useState(false);
+
   if (!isOpen || !member) return null;
 
   return (
@@ -53,8 +55,9 @@ const MemberProfileModal: React.FC<MemberProfileModalProps> = ({ member, isOpen,
                 <img
                   src={member.img || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&background=0D9488&color=fff`}
                   alt={member.name}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover transition-transform hover:scale-110 cursor-zoom-in"
                   referrerPolicy="no-referrer"
+                  onClick={() => setShowFullImage(true)}
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&background=0D9488&color=fff`;
                   }}
@@ -142,6 +145,14 @@ const MemberProfileModal: React.FC<MemberProfileModalProps> = ({ member, isOpen,
           </div>
         </div>
       </div>
+
+      {showFullImage && member.img && (
+        <ImageViewer
+          src={member.img}
+          alt={member.name}
+          onClose={() => setShowFullImage(false)}
+        />
+      )}
       <style>{`
         @keyframes scaleUp {
           from { transform: scale(0.95); opacity: 0; }

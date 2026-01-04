@@ -54,7 +54,7 @@ const EncryptionUnlockModal: React.FC<EncryptionUnlockModalProps> = ({ isOpen, o
                             type="password"
                             value={pin}
                             onChange={(e) => setPin(e.target.value)}
-                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-nsp-teal/50 focus:border-nsp-teal transition-all text-center tracking-widest text-lg"
+                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-nsp-teal/50 focus:border-nsp-teal transition-all text-center tracking-widest text-lg text-gray-900"
                             placeholder="Enter PIN"
                             autoFocus
                         />

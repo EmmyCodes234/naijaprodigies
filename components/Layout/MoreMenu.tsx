@@ -15,9 +15,7 @@ const MoreMenu: React.FC<MoreMenuProps> = ({ isOpen, onClose, menuRef }) => {
 
     const menuItems = [
         { label: 'Settings and privacy', icon: 'ph:gear', path: '/settings' },
-        { label: 'Tournaments', icon: 'ph:trophy', path: '/tournaments' },
         { label: 'Members', icon: 'ph:users', path: '/members' },
-        { label: 'Blog', icon: 'ph:article', path: '/blog' },
     ];
 
     const legalItems = [

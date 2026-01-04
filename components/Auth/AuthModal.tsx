@@ -82,7 +82,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                   type="text"
                   value={handle}
                   onChange={(e) => setHandle(e.target.value)}
-                  className="w-full px-4 py-2 bg-[#052120] border border-gray-600 rounded-lg focus:outline-none focus:border-nsp-orange"
+                  className="w-full px-4 py-2 bg-[#052120] border border-gray-600 rounded-lg focus:outline-none focus:border-nsp-orange text-white"
                   placeholder="@username"
                   required
                 />
@@ -93,7 +93,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full px-4 py-2 bg-[#052120] border border-gray-600 rounded-lg focus:outline-none focus:border-nsp-orange"
+                  className="w-full px-4 py-2 bg-[#052120] border border-gray-600 rounded-lg focus:outline-none focus:border-nsp-orange text-white"
                   placeholder="Your name"
                   required
                 />
@@ -107,7 +107,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2 bg-[#052120] border border-gray-600 rounded-lg focus:outline-none focus:border-nsp-orange"
+              className="w-full px-4 py-2 bg-[#052120] border border-gray-600 rounded-lg focus:outline-none focus:border-nsp-orange text-white"
               placeholder="you@example.com"
               required
             />
@@ -119,7 +119,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 bg-[#052120] border border-gray-600 rounded-lg focus:outline-none focus:border-nsp-orange"
+              className="w-full px-4 py-2 bg-[#052120] border border-gray-600 rounded-lg focus:outline-none focus:border-nsp-orange text-white"
               placeholder="••••••••"
               required
               minLength={6}

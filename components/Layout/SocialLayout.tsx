@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { getTrends } from '../../services/postService';
 import { getWhoToFollow, followUser } from '../../services/userService';
+import { getUnreadMessageCount, subscribeToConversations } from '../../services/messageService';
+import { supabase } from '../../services/supabaseClient';
 import { Icon } from '@iconify/react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import SearchBar from '../SearchBar';
@@ -34,6 +36,10 @@ const SocialLayout: React.FC<SocialLayoutProps> = ({ children, showWidgets = tru
     const moreButtonRef = React.useRef<HTMLButtonElement>(null);
     const [trends, setTrends] = useState<{ tag: string; count: number }[]>([]);
     const [suggestedUsers, setSuggestedUsers] = useState<any[]>([]);
+
+    // Navigation Indicators
+    const [unreadMessages, setUnreadMessages] = useState(0);
+    const [hasNewPosts, setHasNewPosts] = useState(false);
 
     // Scroll Awareness State
     const [visible, setVisible] = useState(true);
@@ -106,6 +112,69 @@ const SocialLayout: React.FC<SocialLayoutProps> = ({ children, showWidgets = tru
         fetchSuggestedUsers();
     }, [currentUser]);
 
+    // Fetch Unread Messages Count & Subscribe
+    useEffect(() => {
+        if (!currentUser) return;
+
+        const fetchUnread = async () => {
+            try {
+                const count = await getUnreadMessageCount(currentUser.id);
+                setUnreadMessages(count);
+            } catch (error) {
+                console.error('Failed to get unread messages', error);
+            }
+        };
+
+        fetchUnread();
+
+        // Subscribe to conversation updates (new messages update last_updated)
+        // Note: subscribeToConversations listens to 'messages' INSERTs essentially
+        const unsubscribe = subscribeToConversations(currentUser.id, () => {
+            fetchUnread();
+        });
+
+        // 2. Subscribe to NEW POSTS for 'Home' indicator
+        const postsChannel = supabase
+            .channel('public:posts')
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'posts',
+                    filter: `user_id=neq.${currentUser.id}` // Don't notify for own posts
+                },
+                () => {
+                    // Only show dot if NOT on home feed
+                    if (location.pathname !== '/feed') {
+                        setHasNewPosts(true);
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            unsubscribe();
+            supabase.removeChannel(postsChannel);
+        };
+    }, [currentUser, location.pathname]);
+
+    // Clear "New Posts" dot when visiting feed
+    useEffect(() => {
+        if (location.pathname === '/feed') {
+            setHasNewPosts(false);
+        }
+    }, [location.pathname]);
+
+    // Recalculate unread messages when marking as read (can be triggered by route change to messages)
+    useEffect(() => {
+        if (location.pathname.startsWith('/messages')) {
+            // Ideally we'd only refresh when a specific conversation is opened, 
+            // but refreshing count on message route visit is a safe fallback
+            if (currentUser) getUnreadMessageCount(currentUser.id).then(setUnreadMessages);
+        }
+    }, [location.pathname, currentUser]);
+
     const onFollowUser = async (userId: string) => {
         if (!currentUser) {
             alert('Please login to follow users');
@@ -140,6 +209,8 @@ const SocialLayout: React.FC<SocialLayoutProps> = ({ children, showWidgets = tru
                         {NavItems.map((item) => {
                             const isActive = location.pathname === item.path;
                             const isMore = item.label === 'More';
+                            const isMessages = item.label === 'Messages';
+                            const isHome = item.label === 'Home';
 
                             return (
                                 <div key={item.label} className="relative group w-auto xl:w-full">
@@ -168,6 +239,14 @@ const SocialLayout: React.FC<SocialLayoutProps> = ({ children, showWidgets = tru
                                                 <div className="absolute -top-1 -right-0.5 min-w-[18px] h-[18px] bg-nsp-teal text-white text-[10px] font-bold flex items-center justify-center rounded-full px-1 border border-white">
                                                     {unreadCount > 99 ? '99+' : unreadCount}
                                                 </div>
+                                            )}
+                                            {isMessages && unreadMessages > 0 && (
+                                                <div className="absolute -top-1 -right-0.5 min-w-[18px] h-[18px] bg-nsp-teal text-white text-[10px] font-bold flex items-center justify-center rounded-full px-1 border border-white">
+                                                    {unreadMessages > 99 ? '99+' : unreadMessages}
+                                                </div>
+                                            )}
+                                            {isHome && hasNewPosts && (
+                                                <div className="absolute top-0 right-0 w-2.5 h-2.5 bg-nsp-teal rounded-full border-2 border-white"></div>
                                             )}
                                         </div>
                                         <span className={`hidden xl:block text-[20px] ${isActive ? 'font-bold' : 'font-normal'} text-gray-900 mr-4`}>
@@ -324,6 +403,8 @@ const SocialLayout: React.FC<SocialLayoutProps> = ({ children, showWidgets = tru
                         const item = NavItems.find(i => i.label === targetLabel);
                         if (!item) return null;
                         const isActive = location.pathname === item.path;
+                        const isMessages = item.label === 'Messages';
+                        const isHome = item.label === 'Home';
 
                         return (
                             <button
@@ -348,6 +429,14 @@ const SocialLayout: React.FC<SocialLayoutProps> = ({ children, showWidgets = tru
                                         <div className="absolute -top-1 -right-1 min-w-[16px] h-[16px] bg-nsp-teal text-white text-[10px] font-bold flex items-center justify-center rounded-full px-1 border-2 border-white">
                                             {unreadCount > 99 ? '99+' : unreadCount}
                                         </div>
+                                    )}
+                                    {isMessages && unreadMessages > 0 && (
+                                        <div className="absolute -top-1 -right-1 min-w-[16px] h-[16px] bg-nsp-teal text-white text-[10px] font-bold flex items-center justify-center rounded-full px-1 border-2 border-white">
+                                            {unreadMessages > 99 ? '99+' : unreadMessages}
+                                        </div>
+                                    )}
+                                    {isHome && hasNewPosts && (
+                                        <div className="absolute top-0 right-1 w-2 h-2 bg-nsp-teal rounded-full border border-white"></div>
                                     )}
                                 </div>
                             </button>

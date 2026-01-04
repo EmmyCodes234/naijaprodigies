@@ -63,7 +63,7 @@ const EncryptionSetupModal: React.FC<EncryptionSetupModalProps> = ({ isOpen, onS
                             type="password"
                             value={pin}
                             onChange={(e) => setPin(e.target.value)}
-                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-nsp-teal/50 focus:border-nsp-teal transition-all"
+                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-nsp-teal/50 focus:border-nsp-teal transition-all text-gray-900"
                             placeholder="Enter a secure PIN"
                             autoFocus
                         />
@@ -74,7 +74,7 @@ const EncryptionSetupModal: React.FC<EncryptionSetupModalProps> = ({ isOpen, onS
                             type="password"
                             value={confirmPin}
                             onChange={(e) => setConfirmPin(e.target.value)}
-                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-nsp-teal/50 focus:border-nsp-teal transition-all"
+                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-nsp-teal/50 focus:border-nsp-teal transition-all text-gray-900"
                             placeholder="Repeat your PIN"
                         />
                     </div>

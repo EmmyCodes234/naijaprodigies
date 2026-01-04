@@ -8,15 +8,17 @@ const Members: React.FC = () => {
   const [selectedMember, setSelectedMember] = useState<MemberData | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const members: MemberData[] = membersDataRaw.map(m => ({
-    name: `${m.firstName} ${m.surname}`,
+  // Safeguard against non-array data
+  const safeMembersData = Array.isArray(membersDataRaw) ? membersDataRaw : [];
+
+  const members: MemberData[] = safeMembersData.map(m => ({
+    name: `${m.firstName || ''} ${m.surname || ''}`.trim() || 'Unknown Member',
     rank: m.category || "Member",
     title: m.state || "NSP Member",
-    img: m.image || undefined, // undefined triggers default in Modal
+    img: m.image || undefined,
     state: m.state,
     category: m.category,
-    // Add default mock stats if we want to show something, or leave undefined to hide
-    // For now, we leave them undefined so they hide in modal.
+    rating: 'Unrated', // Default rating to avoid issues
   }));
 
   const filteredMembers = members.filter(m =>

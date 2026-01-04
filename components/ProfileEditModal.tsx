@@ -290,7 +290,7 @@ const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
               maxLength={MAX_BIO_LENGTH}
               rows={3}
               disabled={isSubmitting}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-nsp-teal focus:border-transparent resize-none"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-nsp-teal focus:border-transparent resize-none text-gray-900"
             />
           </div>
 
@@ -305,7 +305,7 @@ const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
               placeholder="e.g. Lagos, Nigeria"
               maxLength={30}
               disabled={isSubmitting}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-nsp-teal focus:border-transparent"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-nsp-teal focus:border-transparent text-gray-900"
             />
           </div>
 
@@ -320,7 +320,7 @@ const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
               placeholder="e.g. https://example.com"
               maxLength={100}
               disabled={isSubmitting}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-nsp-teal focus:border-transparent"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-nsp-teal focus:border-transparent text-gray-900"
             />
           </div>
 
@@ -333,7 +333,7 @@ const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
               value={birthDate}
               onChange={(e) => setBirthDate(e.target.value)}
               disabled={isSubmitting}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-nsp-teal focus:border-transparent"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-nsp-teal focus:border-transparent text-gray-900"
             />
           </div>
 
@@ -347,7 +347,7 @@ const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
               value={rank}
               onChange={(e) => setRank(e.target.value)}
               disabled={isSubmitting}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-nsp-teal focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-nsp-teal focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed text-gray-900"
             >
               <option value="">Select your rank</option>
               {RANK_OPTIONS.map((rankOption) => (

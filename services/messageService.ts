@@ -428,9 +428,53 @@ export const markConversationAsRead = async (
     .eq('conversation_id', conversationId)
     .eq('user_id', userId)
 
+    .eq('user_id', userId)
+
   if (error) {
     throw new Error(`Failed to mark conversation as read: ${error.message}`)
   }
+}
+
+/**
+ * Get total count of unread messages across all conversations
+ * Efficient query using count only
+ */
+export const getUnreadMessageCount = async (userId: string): Promise<number> => {
+  // We need to count messages where:
+  // 1. User is a participant in the conversation
+  // 2. Message is NOT sent by the user
+  // 3. Message created_at > user's last_read_at for that conversation
+
+  // Since Supabase doesn't support complex joins in simple count queries easily without views,
+  // we'll use a two-step approach or a stored procedure.
+  // For now, let's use the efficient client-side approach (fetch participants, then count).
+
+  // 1. Get all conversations and last_read_at for the user
+  const { data: participations, error: pError } = await supabase
+    .from('conversation_participants')
+    .select('conversation_id, last_read_at')
+    .eq('user_id', userId);
+
+  if (pError || !participations || participations.length === 0) return 0;
+
+  let totalUnread = 0;
+
+  // 2. For each conversation, count unread messages
+  // This could be N+1 queries, but 'count' is fast. 
+  // Optimization: Create a database function `get_unread_message_count(user_id)` later.
+
+  await Promise.all(participations.map(async (p) => {
+    const { count } = await supabase
+      .from('messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('conversation_id', p.conversation_id)
+      .neq('sender_id', userId)
+      .gt('created_at', p.last_read_at || '1970-01-01');
+
+    if (count) totalUnread += count;
+  }));
+
+  return totalUnread;
 }
 
 /**
