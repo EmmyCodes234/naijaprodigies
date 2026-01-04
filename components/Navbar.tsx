@@ -47,9 +47,7 @@ const Navbar: React.FC<NavbarProps> = ({ onWizardClick, onAuthClick }) => {
         {/* Logo */}
         <div className="flex flex-col">
           <Link to="/">
-            <h1 className="text-2xl font-black tracking-tighter leading-none text-white cursor-pointer select-none hover:text-nsp-orange transition-colors">
-              NSP
-            </h1>
+            <img src="/nsp_logo_white.png?v=2" alt="NSP" className="h-10 w-auto object-contain" />
           </Link>
         </div>
 
@@ -119,8 +117,8 @@ const Navbar: React.FC<NavbarProps> = ({ onWizardClick, onAuthClick }) => {
       {/* Mobile Menu Overlay */}
       <div
         className={`md:hidden absolute top-full left-0 w-full bg-nsp-dark-teal/95 backdrop-blur-xl border-t border-white/10 shadow-2xl transition-all duration-300 ease-in-out origin-top ${mobileMenuOpen
-            ? 'opacity-100 translate-y-0 pointer-events-auto visible'
-            : 'opacity-0 -translate-y-4 pointer-events-none invisible'
+          ? 'opacity-100 translate-y-0 pointer-events-auto visible'
+          : 'opacity-0 -translate-y-4 pointer-events-none invisible'
           }`}
       >
         <div className="flex flex-col items-center gap-6 py-10 px-6">

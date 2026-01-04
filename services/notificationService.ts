@@ -14,6 +14,7 @@ export interface Notification {
     actor_name?: string;
     actor_avatar?: string;
     actor_verified?: boolean;
+    actor_verification_type?: 'green' | 'gold' | 'grey' | null;
     post_content?: string;
     comment_content?: string;
 }
@@ -128,7 +129,7 @@ export const subscribeToNotifications = (
     };
 };
 
-const PUBLIC_VAPID_KEY = 'BGwy0VjV1ei-azSPnBaMaAczAfAYmZMNqXABU8uJkE8LODI8jFDoI4c8BVqEsOHRX6Qvo7BitWV-xFxuah_2kc'; // Hardcoded for now or use env
+const PUBLIC_VAPID_KEY = 'BHyiR3nPg303J4wHTB28pWtWjqtgbUbrS-Ls6I-FCKLlZAznA_0dgfGU1hxhvuqfrSx_0lrwR36evRRbHZ4XeZM';
 
 function urlBase64ToUint8Array(base64String: string) {
     const padding = '='.repeat((4 - base64String.length % 4) % 4);
@@ -182,8 +183,13 @@ export const subscribeToPushNotifications = async (userId: string): Promise<bool
         }
 
         return true;
-    } catch (error) {
-        console.error('Error subscribing to push:', error);
+    } catch (error: any) {
+        if (error.name === 'InvalidAccessError') {
+            console.warn('Push notification subscription failed. The VAPID Public Key appears to be invalid or expired. Please generate a new key pair using web-push.');
+            console.warn('Current Key:', PUBLIC_VAPID_KEY);
+        } else {
+            console.error('Error subscribing to push:', error);
+        }
         return false;
     }
 };

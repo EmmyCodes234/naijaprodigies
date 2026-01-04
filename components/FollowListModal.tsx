@@ -5,6 +5,7 @@ import { getFollowers, getFollowing } from '../services/userService';
 import { useNavigate } from 'react-router-dom';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import FollowButton from './FollowButton';
+import VerifiedBadge from './Shared/VerifiedBadge';
 
 interface FollowListModalProps {
   isOpen: boolean;
@@ -34,11 +35,11 @@ const FollowListModal: React.FC<FollowListModalProps> = ({
       try {
         setLoading(true);
         setError(null);
-        
-        const data = type === 'followers' 
+
+        const data = type === 'followers'
           ? await getFollowers(userId)
           : await getFollowing(userId);
-        
+
         setUsers(data);
       } catch (err) {
         console.error(`Failed to load ${type}:`, err);
@@ -60,7 +61,7 @@ const FollowListModal: React.FC<FollowListModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div 
+      <div
         className="bg-white rounded-2xl w-full max-w-md max-h-[80vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
@@ -104,7 +105,7 @@ const FollowListModal: React.FC<FollowListModalProps> = ({
                 >
                   <div className="flex items-center gap-3">
                     {/* Avatar */}
-                    <div 
+                    <div
                       className="cursor-pointer"
                       onClick={() => handleUserClick(user.id)}
                     >
@@ -116,7 +117,7 @@ const FollowListModal: React.FC<FollowListModalProps> = ({
                     </div>
 
                     {/* User Info */}
-                    <div 
+                    <div
                       className="flex-1 min-w-0 cursor-pointer"
                       onClick={() => handleUserClick(user.id)}
                     >
@@ -124,9 +125,7 @@ const FollowListModal: React.FC<FollowListModalProps> = ({
                         <span className="font-bold text-gray-900 truncate">
                           {user.name}
                         </span>
-                        {user.verified && (
-                          <Icon icon="ph:seal-check-fill" className="text-green-500 flex-shrink-0" width="16" height="16" />
-                        )}
+                        <VerifiedBadge user={user} size={16} />
                       </div>
                       <p className="text-gray-500 text-sm truncate">@{user.handle}</p>
                       {user.bio && (

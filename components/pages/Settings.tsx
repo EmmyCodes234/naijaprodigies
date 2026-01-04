@@ -47,7 +47,7 @@ const Settings: React.FC = () => {
 
     return (
         <SocialLayout>
-            <div className="sticky top-[60px] md:top-[72px] z-30 bg-white/80 backdrop-blur-md border-b border-gray-100 px-4 py-3">
+            <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-gray-100 px-4 py-3">
                 <h2 className="font-bold text-xl text-gray-900">Settings</h2>
                 <p className="text-xs text-gray-500">@{currentUser?.handle}</p>
             </div>
@@ -57,18 +57,20 @@ const Settings: React.FC = () => {
                     <SettingsItem
                         icon="ph:user-circle"
                         label="Account Information"
-                        description="See your account information like your phone number and email address."
-                        to={`/profile/${currentUser?.id}`}
+                        description="See your account information like your email address and username."
+                        to="/settings/account"
                     />
                     <SettingsItem
                         icon="ph:lock-key"
                         label="Change your password"
-                        description="Change your password at any time."
+                        description="Change your password securely."
+                        to="/settings/security"
                     />
                     <SettingsItem
                         icon="ph:download-simple"
                         label="Download an archive of your data"
                         description="Get insights into the type of information stored for your account."
+                        to="/settings/download-data"
                     />
                 </SettingsSection>
 
@@ -77,16 +79,19 @@ const Settings: React.FC = () => {
                         icon="ph:shield-check"
                         label="Security"
                         description="Manage your account's security and keep track of your account's usage."
+                        to="/settings/security"
                     />
                     <SettingsItem
                         icon="ph:app-window"
                         label="Apps and Sessions"
                         description="See apps and sessions that you've logged into."
+                        to="/settings/security"
                     />
                     <SettingsItem
                         icon="ph:users"
                         label="Connected Accounts"
                         description="Manage Google or Apple accounts connected to NSP."
+                        to="/settings/connected-accounts"
                     />
                 </SettingsSection>
 
@@ -94,14 +99,22 @@ const Settings: React.FC = () => {
                     <SettingsItem
                         icon="ph:question"
                         label="Help Center"
+                        to="/story"
                     />
                     <SettingsItem
                         icon="ph:file-text"
                         label="Terms of Service"
+                        to="/terms"
                     />
                     <SettingsItem
                         icon="ph:shield"
                         label="Privacy Policy"
+                        to="/privacy"
+                    />
+                    <SettingsItem
+                        icon="ph:cookie"
+                        label="Cookie Policy"
+                        to="/cookie-policy"
                     />
                 </SettingsSection>
 

@@ -82,14 +82,16 @@ export const getMessages = async (
 export const sendMessage = async (
   senderId: string,
   recipientId: string,
-  content: string
+  content: string,
+  mediaUrl?: string | null,
+  mediaType?: 'image' | 'video' | 'gif' | null
 ): Promise<Message> => {
   // Validate character limit (4000 chars for encrypted blob)
   if (content.length > 4000) {
     throw new Error('Message content exceeds limit')
   }
 
-  if (!content.trim()) throw new Error('Message content cannot be empty')
+  if (!content.trim() && !mediaUrl) throw new Error('Message content cannot be empty')
   if (senderId === recipientId) throw new Error('Cannot send message to yourself')
 
   // Get or create conversation
@@ -107,7 +109,7 @@ export const sendMessage = async (
   if (recipientKeyData?.public_key) {
     try {
       const recipientPublicKey = await crypto.importPublicKey(JSON.parse(recipientKeyData.public_key));
-      encryptedContent = await crypto.encryptMessage(content, recipientPublicKey);
+      encryptedContent = await crypto.encryptMessage(content || '', recipientPublicKey);
     } catch (e) {
       console.error('Failed to encrypt message', e);
       throw new Error('Encryption failed. Message not sent.');
@@ -124,7 +126,9 @@ export const sendMessage = async (
     .insert({
       conversation_id: conversationId,
       sender_id: senderId,
-      content: encryptedContent
+      content: encryptedContent,
+      media_url: mediaUrl,
+      media_type: mediaType
     })
     .select()
     .single()

@@ -14,6 +14,8 @@ import FollowButton from '../FollowButton';
 import SkeletonProfileHeader from '../Loaders/SkeletonProfileHeader';
 import SkeletonPost from '../Loaders/SkeletonPost';
 import { getAvatarUrl } from '../../utils/userUtils';
+import Avatar from '../Shared/Avatar';
+import VerifiedBadge from '../Shared/VerifiedBadge';
 
 type TabType = 'posts' | 'media' | 'liked';
 
@@ -242,10 +244,10 @@ const UserProfile: React.FC = () => {
   }
 
   return (
-    <div className="bg-white min-h-screen pt-16">
+    <div className="bg-white min-h-screen">
       <div className="max-w-2xl mx-auto">
         {/* Header with back button */}
-        <div className="sticky top-16 bg-white/80 backdrop-blur-md border-b border-gray-200 z-10">
+        <div className="sticky top-0 bg-white/80 backdrop-blur-md border-b border-gray-200 z-10">
           <div className="px-4 py-3 flex items-center gap-4">
             <button
               onClick={() => navigate(-1)}
@@ -254,7 +256,10 @@ const UserProfile: React.FC = () => {
               <Icon icon="ph:arrow-left" width="20" height="20" className="text-gray-900" />
             </button>
             <div>
-              <h1 className="text-xl font-bold text-gray-900">{user.name}</h1>
+              <div className="flex items-center gap-1">
+                <h1 className="text-xl font-bold text-gray-900">{user.name}</h1>
+                <VerifiedBadge user={user} size={18} />
+              </div>
               <p className="text-sm text-gray-500">{posts.length} posts</p>
             </div>
           </div>
@@ -262,62 +267,67 @@ const UserProfile: React.FC = () => {
 
         {/* Profile Header */}
         <div className="border-b border-gray-200">
-          {/* Cover Image Placeholder */}
-          <div className="h-48 bg-gradient-to-r from-nsp-teal to-nsp-dark-teal"></div>
+          {/* Cover Image */}
+          <div className="h-48 w-full bg-gray-200">
+            {user.cover_url ? (
+              <img src={user.cover_url} alt="Cover" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-r from-nsp-teal to-nsp-dark-teal"></div>
+            )}
+          </div>
 
           {/* Profile Info */}
           <div className="px-4 pb-4">
-            {/* Avatar */}
-            <div className="relative -mt-16 mb-4">
-              <div className="relative inline-block">
-                <img
-                  src={getAvatarUrl(user)}
-                  alt={user.name}
-                  className="w-32 h-32 rounded-full border-4 border-white object-cover"
-                />
-                {user.rank === 'Grandmaster' && (
-                  <div className="absolute bottom-2 right-2 bg-nsp-yellow text-nsp-dark-teal p-2 rounded-full border-2 border-white" title="Grandmaster">
-                    <Icon icon="ph:crown-fill" width="20" height="20" />
-                  </div>
-                )}
+            {/* Action Buttons (Top Right) */}
+            <div className="flex justify-between items-start">
+              {/* Avatar (Left) */}
+              <div className="relative -mt-16 mb-4">
+                <div className="relative inline-block">
+                  <Avatar
+                    user={user}
+                    alt={user.name}
+                    className="w-32 h-32 rounded-full border-4 border-white object-cover bg-white"
+                  />
+                  {user.rank === 'Grandmaster' && (
+                    <div className="absolute bottom-2 right-2 bg-nsp-yellow text-nsp-dark-teal p-2 rounded-full border-2 border-white" title="Grandmaster">
+                      <Icon icon="ph:crown-fill" width="20" height="20" />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Buttons */}
+              <div className="mt-4 flex gap-2">
+                {currentUser?.id === user.id ? (
+                  <button
+                    onClick={() => setShowEditModal(true)}
+                    className="px-4 py-2 border border-gray-300 rounded-full font-bold text-gray-900 hover:bg-gray-50 transition-colors"
+                  >
+                    Edit Profile
+                  </button>
+                ) : currentUser ? (
+                  <>
+                    <button
+                      onClick={() => navigate(`/messages?user=${user.id}`)}
+                      className="p-2 border border-gray-300 rounded-full font-bold text-gray-900 hover:bg-gray-50 transition-colors"
+                      title="Send message"
+                    >
+                      <Icon icon="ph:envelope" width="20" height="20" />
+                    </button>
+                    <FollowButton
+                      targetUserId={user.id}
+                      currentUserId={currentUser.id}
+                      onFollowChange={handleFollowChange}
+                    />
+                  </>
+                ) : null}
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex justify-end gap-2 mb-4">
-              {currentUser?.id === user.id ? (
-                <button
-                  onClick={() => setShowEditModal(true)}
-                  className="px-4 py-2 border border-gray-300 rounded-full font-bold text-gray-900 hover:bg-gray-50 transition-colors"
-                >
-                  Edit Profile
-                </button>
-              ) : currentUser ? (
-                <>
-                  <button
-                    onClick={() => navigate(`/messages?user=${user.id}`)}
-                    className="px-4 py-2 border border-gray-300 rounded-full font-bold text-gray-900 hover:bg-gray-50 transition-colors flex items-center gap-2"
-                    title="Send message"
-                  >
-                    <Icon icon="ph:envelope" width="20" height="20" />
-                    Message
-                  </button>
-                  <FollowButton
-                    targetUserId={user.id}
-                    currentUserId={currentUser.id}
-                    onFollowChange={handleFollowChange}
-                  />
-                </>
-              ) : null}
-            </div>
-
-            {/* User Info */}
             <div className="mb-4">
               <div className="flex items-center gap-2 mb-1">
                 <h2 className="text-2xl font-bold text-gray-900">{user.name}</h2>
-                {user.verified && (
-                  <Icon icon="ph:seal-check-fill" className="text-green-500" width="24" height="24" />
-                )}
+                <VerifiedBadge user={user} size={24} />
               </div>
               <p className="text-gray-500">@{user.handle}</p>
             </div>
@@ -326,6 +336,32 @@ const UserProfile: React.FC = () => {
             {user.bio && (
               <p className="text-gray-900 mb-4 whitespace-pre-wrap">{user.bio}</p>
             )}
+
+            {/* Metadata (Location, Website, Date joined) */}
+            <div className="flex flex-wrap gap-x-4 gap-y-2 text-gray-500 text-sm mb-4">
+              {user.location && (
+                <div className="flex items-center gap-1">
+                  <Icon icon="ph:map-pin" width="18" height="18" />
+                  <span>{user.location}</span>
+                </div>
+              )}
+              {user.website && (
+                <div className="flex items-center gap-1">
+                  <Icon icon="ph:link" width="18" height="18" />
+                  <a href={user.website} target="_blank" rel="noopener noreferrer" className="text-nsp-teal hover:underline">{user.website.replace(/^https?:\/\//, '')}</a>
+                </div>
+              )}
+              {user.birth_date && (
+                <div className="flex items-center gap-1">
+                  <Icon icon="ph:balloon" width="18" height="18" />
+                  <span>Born {new Date(user.birth_date).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+                </div>
+              )}
+              <div className="flex items-center gap-1">
+                <Icon icon="ph:calendar-blank" width="18" height="18" />
+                <span>Joined {new Date(user.created_at).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</span>
+              </div>
+            </div>
 
             {/* Rank Badge */}
             {user.rank && (

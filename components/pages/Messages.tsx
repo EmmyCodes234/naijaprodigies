@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { Icon } from '@iconify/react';
+import SocialLayout from '../Layout/SocialLayout';
 import { useCurrentUser } from '../../hooks/useCurrentUser';
 import ConversationList from '../Messaging/ConversationList';
 import MessageThread from '../Messaging/MessageThread';
@@ -202,74 +203,73 @@ const Messages: React.FC = () => {
   const selectedConversation = conversations.find(c => c.id === activeConversationId);
 
   return (
-    <div className="bg-white min-h-screen pt-[72px] md:pt-20">
-      <div className="max-w-[1265px] mx-auto h-[calc(100vh-72px)] md:h-[calc(100vh-80px)]">
-        <div className="flex h-full border-x border-gray-100">
+    <SocialLayout showWidgets={false} fullWidth={true} hideBottomNav={!!activeConversationId}>
+      <div className="h-[calc(100vh)] md:h-[100vh] flex flex-col md:flex-row overflow-hidden bg-white">
 
-          {/* Conversation List - Left Panel */}
-          <div className={`${activeConversationId ? 'hidden md:block' : 'block'} w-full md:w-[400px] border-r border-gray-100 flex flex-col`}>
-            {/* Header */}
-            <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-md px-4 py-3 border-b border-gray-100">
-              <div className="flex items-center justify-between">
-                <h2 className="font-bold text-xl text-gray-900">Messages</h2>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => navigate('/settings')}
-                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                    title="Settings"
-                  >
-                    <Icon icon="ph:gear-bold" width="20" height="20" className="text-gray-700" />
-                  </button>
-                  <button
-                    onClick={() => setIsNewMessageModalOpen(true)}
-                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                    title="New Message"
-                  >
-                    <Icon icon="ph:note-pencil-bold" width="20" height="20" className="text-gray-700" />
-                  </button>
-                </div>
+        {/* Conversation List - Left Panel */}
+        {/* On mobile: visible if no active conversation */}
+        {/* On desktop: always visible (w-[400px]) */}
+        <div className={`${activeConversationId ? 'hidden md:flex' : 'flex'} w-full md:w-[380px] lg:w-[400px] border-r border-gray-100 flex-col h-full bg-white`}>
+          {/* Header */}
+          <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-md px-4 border-b border-gray-100 flex-shrink-0 min-h-[53px] flex items-center">
+            <div className="flex items-center justify-between w-full">
+              <h2 className="font-bold text-xl text-gray-900">Messages</h2>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => navigate('/settings')}
+                  className="p-2 hover:bg-black/5 rounded-full transition-colors"
+                  title="Settings"
+                >
+                  <Icon icon="ph:gear-bold" width="20" height="20" className="text-gray-900" />
+                </button>
+                <button
+                  onClick={() => setIsNewMessageModalOpen(true)}
+                  className="p-2 hover:bg-black/5 rounded-full transition-colors"
+                  title="New Message"
+                >
+                  <Icon icon="ph:note-pencil-bold" width="20" height="20" className="text-gray-900" />
+                </button>
               </div>
             </div>
-
-            {/* Conversation List */}
-            <ConversationList
-              conversations={conversations}
-              selectedConversationId={activeConversationId}
-              onSelectConversation={setActiveConversationId}
-              currentUserId={currentUser.id}
-            />
           </div>
 
-          {/* Message Thread - Right Panel */}
-          <div className={`${activeConversationId ? 'block' : 'hidden md:block'} flex-1 flex flex-col`}>
-            {selectedConversation ? (
-              <MessageThread
-                conversation={selectedConversation}
-                currentUser={currentUser}
-                onBack={() => setActiveConversationId(null)}
-              />
-            ) : (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center max-w-md px-8">
-                  <div className="mb-6">
-                    <Icon icon="ph:envelope-simple" width="80" height="80" className="text-gray-300 mx-auto" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">Select a message</h3>
-                  <p className="text-gray-500">
-                    Choose from your existing conversations, or start a new one.
-                  </p>
-                  <button
-                    onClick={() => setIsNewMessageModalOpen(true)}
-                    className="mt-6 px-6 py-3 bg-nsp-teal hover:bg-nsp-dark-teal text-white font-bold rounded-full transition-colors"
-                  >
-                    New message
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
+          {/* Conversation List */}
+          <ConversationList
+            conversations={conversations}
+            selectedConversationId={activeConversationId}
+            onSelectConversation={setActiveConversationId}
+            currentUserId={currentUser.id}
+          />
         </div>
+
+        {/* Message Thread - Right Panel */}
+        {/* On mobile: visible if active conversation */}
+        {/* On desktop: always visible (flex-1) */}
+        <div className={`${activeConversationId ? 'flex' : 'hidden md:flex'} flex-1 flex-col h-full bg-white relative`}>
+          {selectedConversation ? (
+            <MessageThread
+              conversation={selectedConversation}
+              currentUser={currentUser}
+              onBack={() => setActiveConversationId(null)}
+            />
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center h-full">
+              <div className="max-w-[400px] w-full text-left">
+                <h3 className="text-[31px] leading-[36px] font-black text-gray-900 mb-2">Select a message</h3>
+                <p className="text-[15px] text-gray-500 mb-7 leading-normal">
+                  Choose from your existing conversations, start a new one, or get verified to message others.
+                </p>
+                <button
+                  onClick={() => setIsNewMessageModalOpen(true)}
+                  className="bg-nsp-teal hover:bg-nsp-dark-teal text-white font-bold text-[15px] px-8 py-3 rounded-full transition-all shadow-sm hover:shadow-md h-[52px]"
+                >
+                  New message
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
       </div>
 
       <NewMessageModal
@@ -277,7 +277,7 @@ const Messages: React.FC = () => {
         onClose={() => setIsNewMessageModalOpen(false)}
         currentUser={currentUser}
       />
-    </div>
+    </SocialLayout>
   );
 };
 

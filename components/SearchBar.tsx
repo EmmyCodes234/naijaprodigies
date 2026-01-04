@@ -3,6 +3,7 @@ import { Icon } from '@iconify/react'
 import { useNavigate } from 'react-router-dom'
 import { searchAll } from '../services/searchService'
 import type { User, Post } from '../types'
+import VerifiedBadge from './Shared/VerifiedBadge'
 
 interface SearchBarProps {
   className?: string
@@ -136,9 +137,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ className = '' }) => {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1">
                       <span className="font-bold text-gray-900 truncate">{user.name}</span>
-                      {user.verified && (
-                        <Icon icon="ph:seal-check-fill" className="text-green-500 flex-shrink-0" width="16" height="16" />
-                      )}
+                      <VerifiedBadge user={user} size={16} />
                     </div>
                     <div className="text-sm text-gray-500 truncate">@{user.handle}</div>
                   </div>
@@ -176,9 +175,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ className = '' }) => {
                       )}
                     </div>
                     <span className="font-bold text-gray-900 text-sm">{post.user.name}</span>
-                    {post.user.verified && (
-                      <Icon icon="ph:seal-check-fill" className="text-green-500" width="14" height="14" />
-                    )}
+                    <VerifiedBadge user={post.user} size={14} />
                     <span className="text-gray-500 text-sm">@{post.user.handle}</span>
                   </div>
 

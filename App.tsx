@@ -16,12 +16,23 @@ import Messages from './components/pages/Messages';
 import Explore from './components/pages/Explore';
 import Bookmarks from './components/pages/Bookmarks';
 import Settings from './components/pages/Settings';
+import AccountInformation from './components/pages/Settings/AccountInformation';
+import SecuritySettings from './components/pages/Settings/SecuritySettings';
+import ConnectedAccounts from './components/pages/Settings/ConnectedAccounts';
+import DownloadData from './components/pages/Settings/DownloadData';
+import TermsOfService from './components/pages/Legal/TermsOfService';
+import PrivacyPolicy from './components/pages/Legal/PrivacyPolicy';
+import CookiePolicy from './components/pages/Legal/CookiePolicy';
 import WordWizardModal from './components/WordWizardModal';
 import AuthModal from './components/Auth/AuthModal';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
 import { ToastProvider } from './contexts/ToastContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import Footer from './components/Footer';
+import { GistProvider } from './contexts/GistContext';
+import GistDock from './components/Gist/GistDock';
+import GistRoom from './components/Gist/GistRoom';
+import GistJoinHandler from './components/Gist/GistJoinHandler';
 
 // Wrapper to ensure scroll to top on route change
 const ScrollToTop = () => {
@@ -53,14 +64,16 @@ const AppContent: React.FC = () => {
   }, []);
 
   // Determine if footer should be shown
-  const shouldShowFooter = !['/feed', '/messages', '/post', '/profile', '/notifications'].some(path => location.pathname.startsWith(path));
+  const shouldShowFooter = !['/feed', '/messages', '/post', '/profile', '/notifications', '/explore', '/bookmarks', '/settings'].some(path => location.pathname.startsWith(path));
 
   return (
     <div className="bg-[#052120] min-h-screen text-white font-sans selection:bg-nsp-orange selection:text-white flex flex-col">
-      <Navbar
-        onWizardClick={() => setIsWizardOpen(true)}
-        onAuthClick={() => setIsAuthOpen(true)}
-      />
+      {shouldShowFooter && (
+        <Navbar
+          onWizardClick={() => setIsWizardOpen(true)}
+          onAuthClick={() => setIsAuthOpen(true)}
+        />
+      )}
 
       <main className="flex-grow">
         <Routes>
@@ -105,6 +118,34 @@ const AppContent: React.FC = () => {
               <Settings />
             </ProtectedRoute>
           } />
+          <Route path="/settings/account" element={
+            <ProtectedRoute>
+              <AccountInformation />
+            </ProtectedRoute>
+          } />
+          <Route path="/settings/security" element={
+            <ProtectedRoute>
+              <SecuritySettings />
+            </ProtectedRoute>
+          } />
+          <Route path="/settings/connected-accounts" element={
+            <ProtectedRoute>
+              <ConnectedAccounts />
+            </ProtectedRoute>
+          } />
+          <Route path="/settings/download-data" element={
+            <ProtectedRoute>
+              <DownloadData />
+            </ProtectedRoute>
+          } />
+          <Route path="/gist/:gistId" element={
+            <ProtectedRoute>
+              <GistJoinHandler />
+            </ProtectedRoute>
+          } />
+          <Route path="/terms" element={<TermsOfService />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/cookie-policy" element={<CookiePolicy />} />
           <Route path="/story" element={<OurStory />} />
           <Route path="/tournaments" element={<Tournaments />} />
           <Route path="/blog" element={<Blog />} />
@@ -123,6 +164,9 @@ const AppContent: React.FC = () => {
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
       />
+
+      <GistDock />
+      <GistRoom />
     </div>
   );
 };
@@ -133,8 +177,10 @@ const App: React.FC = () => {
       <AuthProvider>
         <ToastProvider>
           <NotificationProvider>
-            <ScrollToTop />
-            <AppContent />
+            <GistProvider>
+              <ScrollToTop />
+              <AppContent />
+            </GistProvider>
           </NotificationProvider>
         </ToastProvider>
       </AuthProvider>

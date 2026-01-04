@@ -51,14 +51,14 @@ export const uploadImages = async (
   files: File[],
   userId: string
 ): Promise<string[]> => {
-  // Validate image count (1-4 images)
+  // Validate file count (1-4 files)
   if (files.length < 1 || files.length > 4) {
-    throw new Error('Must upload between 1 and 4 images')
+    throw new Error('Must upload between 1 and 4 files')
   }
 
   // Upload all images in parallel
   const uploadPromises = files.map(file => uploadImage(file, userId))
-  
+
   try {
     const urls = await Promise.all(uploadPromises)
     return urls
@@ -80,29 +80,6 @@ export const deleteImage = async (imageUrl: string): Promise<void> => {
  * @returns A blob URL for local preview
  */
 export const generatePreview = async (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    // Validate file is an image
-    if (!file.type.startsWith('image/')) {
-      reject(new Error('File must be an image'))
-      return
-    }
-
-    // Create a FileReader to read the file
-    const reader = new FileReader()
-
-    reader.onload = (e) => {
-      if (e.target?.result) {
-        resolve(e.target.result as string)
-      } else {
-        reject(new Error('Failed to read file'))
-      }
-    }
-
-    reader.onerror = () => {
-      reject(new Error('Failed to read file'))
-    }
-
-    // Read the file as a data URL
-    reader.readAsDataURL(file)
-  })
+  // Use createObjectURL for efficient preview of both images and videos
+  return URL.createObjectURL(file);
 }

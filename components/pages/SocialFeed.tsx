@@ -11,11 +11,12 @@ import { getPosts, subscribeToNewPosts, subscribeToLikes, subscribeToReRacks, su
 import SkeletonPost from '../Loaders/SkeletonPost';
 import { useToast } from '../../contexts/ToastContext';
 import { getAvatarUrl } from '../../utils/userUtils';
+import Avatar from '../Shared/Avatar';
 
 const POSTS_PER_PAGE = 20;
 
 const SocialFeedContent: React.FC<{
-  currentUser: any; // Type strictly if possible
+  currentUser: any;
   posts: Post[];
   isLoadingPosts: boolean;
   isLoadingMore: boolean;
@@ -26,7 +27,7 @@ const SocialFeedContent: React.FC<{
   observerTarget: React.RefObject<HTMLDivElement>;
   onCreatePost: (post: Post) => void;
   onLike: (postId: string) => void;
-  onReply: (postId: string, content: string) => void;
+  onReply: (postId: string, content: string, mediaUrl?: string, mediaType?: 'image' | 'video' | 'gif') => void;
   onReRack: (postId: string, type: 'simple' | 'quote', quoteText?: string) => void;
   onDelete: (postId: string) => void;
 }> = ({
@@ -82,16 +83,19 @@ const SocialFeedContent: React.FC<{
     return (
       <>
         {/* Sticky Header with Tabs */}
-        <div className="sticky top-[60px] md:top-[72px] z-30 bg-white/80 backdrop-blur-md border-b border-gray-100">
+        {/* Sticky Header with Tabs */}
+        <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-gray-100 transition-all duration-200">
           <div className="px-4 py-3 flex items-center gap-4 md:hidden">
             {/* Mobile Drawer Trigger */}
-            <div onClick={(e) => { e.stopPropagation(); openDrawer(); }}>
-              <img src={getAvatarUrl(currentUser)} alt="Me" className="w-8 h-8 rounded-full object-cover border border-gray-200" />
+            <button onClick={(e) => { e.stopPropagation(); openDrawer(); }}>
+              <Avatar user={currentUser} alt="Me" className="w-8 h-8 rounded-full object-cover border border-gray-200" />
+            </button>
+            <div className="flex-1 flex justify-center items-center">
+              <img src="/nsp_feed_logo.png" alt="NSP" className="h-10 w-auto object-contain" />
             </div>
-            <div className="flex-1"></div> {/* Spacer */}
             {/* Mobile Top Settings/Sparkle */}
-            <div className="text-nsp-teal">
-              <Icon icon="ph:sparkle-fill" width="20" height="20" />
+            <div className="text-gray-900">
+              <Icon icon="ph:gear-six" width="20" height="20" />
             </div>
           </div>
 
@@ -99,28 +103,32 @@ const SocialFeedContent: React.FC<{
           <div className="flex w-full">
             <button
               onClick={() => setFeedType('for-you')}
-              className="flex-1 hover:bg-gray-100 transition-colors py-4 relative"
+              className="flex-1 hover:bg-black/[0.03] transition-colors relative h-[53px]"
             >
-              <div className="flex justify-center">
-                <span className={`font-bold ${feedType === 'for-you' ? 'text-gray-900' : 'text-gray-500'}`}>
-                  For You
-                </span>
-                {feedType === 'for-you' && (
-                  <div className="absolute bottom-0 h-1 w-14 bg-nsp-teal rounded-full"></div>
-                )}
+              <div className="flex justify-center h-full items-center">
+                <div className="relative h-full flex items-center">
+                  <span className={`font-bold text-[15px] ${feedType === 'for-you' ? 'text-gray-900' : 'text-gray-500'}`}>
+                    For You
+                  </span>
+                  {feedType === 'for-you' && (
+                    <div className="absolute 0 left-0 right-0 h-[4px] bg-nsp-teal rounded-full bottom-0"></div>
+                  )}
+                </div>
               </div>
             </button>
             <button
               onClick={() => setFeedType('following')}
-              className="flex-1 hover:bg-gray-100 transition-colors py-4 relative"
+              className="flex-1 hover:bg-black/[0.03] transition-colors relative h-[53px]"
             >
-              <div className="flex justify-center">
-                <span className={`font-bold ${feedType === 'following' ? 'text-gray-900' : 'text-gray-500'}`}>
-                  Following
-                </span>
-                {feedType === 'following' && (
-                  <div className="absolute bottom-0 h-1 w-20 bg-nsp-teal rounded-full"></div>
-                )}
+              <div className="flex justify-center h-full items-center">
+                <div className="relative h-full flex items-center">
+                  <span className={`font-bold text-[15px] ${feedType === 'following' ? 'text-gray-900' : 'text-gray-500'}`}>
+                    Following
+                  </span>
+                  {feedType === 'following' && (
+                    <div className="absolute 0 left-0 right-0 h-[4px] bg-nsp-teal rounded-full bottom-0"></div>
+                  )}
+                </div>
               </div>
             </button>
           </div>
@@ -401,10 +409,10 @@ const SocialFeed: React.FC = () => {
     }
   };
 
-  const handleReply = async (postId: string, content: string) => {
+  const handleReply = async (postId: string, content: string, mediaUrl?: string, mediaType?: 'image' | 'video' | 'gif') => {
     if (!currentUser) return;
     try {
-      await createComment(postId, currentUser.id, content);
+      await createComment(postId, currentUser.id, content, undefined, mediaUrl, mediaType);
       addToast('success', 'Reply sent');
 
       // Optimistically update counts (optional since realtime subscription handles it too)

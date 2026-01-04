@@ -11,6 +11,10 @@ import { useToast } from '../../contexts/ToastContext';
 import SkeletonPost from '../Loaders/SkeletonPost';
 import { getPostById, getComments, likePost, unlikePost, createReRack, createComment, deletePost } from '../../services/postService';
 import { getAvatarUrl } from '../../utils/userUtils';
+import Avatar from '../Shared/Avatar';
+import EmojiPicker, { EmojiClickData, Theme } from 'emoji-picker-react';
+import GifPicker from '../Shared/GifPicker';
+import { GifResult } from '../../services/gifService';
 
 const PostDetailContent: React.FC<{
     currentUser: any;
@@ -19,9 +23,9 @@ const PostDetailContent: React.FC<{
     isLoading: boolean;
     error: string | null;
     onLike: (postId: string) => void;
-    onReply: (postId: string, content: string) => void;
+    onReply: (postId: string, content: string, mediaUrl?: string, mediaType?: 'image' | 'video' | 'gif') => void;
     onReRack: (postId: string, type: 'simple' | 'quote', quoteText?: string) => void;
-    onCommentReply: (commentId: string, content: string) => void;
+    onCommentReply: (commentId: string, content: string, mediaUrl?: string, mediaType?: 'image' | 'video' | 'gif') => void;
     onDelete: (postId: string) => void;
 }> = ({
     currentUser,
@@ -37,6 +41,44 @@ const PostDetailContent: React.FC<{
 }) => {
         const navigate = useNavigate();
         const { openDrawer } = useSocialLayout();
+
+        // Local state for reply input
+        const [replyContent, setReplyContent] = useState('');
+        const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+        const [showGifPicker, setShowGifPicker] = useState(false);
+        const [mediaUrl, setMediaUrl] = useState<string | null>(null);
+        const [mediaType, setMediaType] = useState<'image' | 'video' | 'gif' | undefined>(undefined);
+        const replyTextareaRef = React.useRef<HTMLTextAreaElement>(null);
+
+        const handleEmojiClick = (emojiData: EmojiClickData) => {
+            if (replyTextareaRef.current) {
+                const start = replyTextareaRef.current.selectionStart;
+                const end = replyTextareaRef.current.selectionEnd;
+                const newContent = replyContent.substring(0, start) + emojiData.emoji + replyContent.substring(end);
+                setReplyContent(newContent);
+                setTimeout(() => {
+                    if (replyTextareaRef.current) {
+                        replyTextareaRef.current.selectionStart = replyTextareaRef.current.selectionEnd = start + emojiData.emoji.length;
+                        replyTextareaRef.current.focus();
+                    }
+                }, 0);
+            } else {
+                setReplyContent(prev => prev + emojiData.emoji);
+            }
+            setShowEmojiPicker(false);
+        };
+
+        const handleGifSelect = (gif: GifResult) => {
+            setMediaUrl(gif.url);
+            setMediaType('gif');
+            setShowGifPicker(false);
+        };
+
+        const clearMedia = () => {
+            setMediaUrl(null);
+            setMediaType(undefined);
+        };
+
 
         if (isLoading) {
             return (
@@ -68,19 +110,12 @@ const PostDetailContent: React.FC<{
         return (
             <>
                 {/* Sticky Header */}
-                <div className="sticky top-[60px] md:top-[72px] z-30 bg-white/80 backdrop-blur-md border-b border-gray-100 px-4 py-3 flex items-center gap-4">
+                <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-gray-100 px-4 py-3 flex items-center gap-3 transition-colors">
                     <div onClick={(e) => { e.stopPropagation(); navigate(-1); }} className="cursor-pointer p-2 -ml-2 hover:bg-gray-100 rounded-full transition-colors">
                         <Icon icon="ph:arrow-left-bold" width="20" height="20" className="text-gray-900" />
                     </div>
                     <h2 className="font-bold text-xl text-gray-900">Post</h2>
-
-                    {/* Spacer */}
                     <div className="flex-1"></div>
-
-                    {/* Mobile Drawer Trigger (Right aligned on mobile if we want, but sticking to Left usually. Here we have Back button)
-              Actually, on a Detail page, usually you don't show the Drawer trigger in the header, you show Back.
-              So we removed the drawer trigger from here.
-          */}
                 </div>
 
                 {/* Main Post */}
@@ -99,28 +134,91 @@ const PostDetailContent: React.FC<{
                 {/* Reply Input Area */}
                 <div className="border-b border-gray-100 px-4 py-3">
                     <div className="flex gap-3">
-                        <img src={getAvatarUrl(currentUser)} className="w-10 h-10 rounded-full object-cover" />
-                        <div className="flex-1">
+                        <Avatar user={currentUser} className="w-10 h-10 rounded-full object-cover" />
+                        <div className="flex-1 relative">
                             <textarea
-                                className="w-full bg-transparent text-lg placeholder-gray-500 focus:outline-none resize-none"
+                                ref={replyTextareaRef}
+                                value={replyContent}
+                                onChange={(e) => {
+                                    setReplyContent(e.target.value);
+                                    e.target.style.height = 'auto';
+                                    e.target.style.height = e.target.value ? `${e.target.scrollHeight}px` : 'auto';
+                                }}
+                                className="w-full bg-transparent text-lg placeholder-gray-500 text-black focus:outline-none resize-none"
                                 placeholder={`Reply to @${post.user.handle || 'user'}...`}
                                 rows={2}
-                                id="post-detail-reply-input"
                             />
+
+                            {/* Media Preview */}
+                            {mediaUrl && (
+                                <div className="mt-2 relative inline-block">
+                                    <img src={mediaUrl} className="max-h-60 rounded-xl border border-gray-200" alt="Attachment" />
+                                    <button
+                                        onClick={clearMedia}
+                                        className="absolute top-1 right-1 bg-black/75 text-white rounded-full p-1 hover:bg-black/90"
+                                    >
+                                        <Icon icon="ph:x-bold" width="12" height="12" />
+                                    </button>
+                                </div>
+                            )}
+
                             <div className="flex justify-between items-center mt-2">
-                                <div className="flex text-nsp-teal gap-2">
-                                    <Icon icon="ph:image" width="24" height="24" className="cursor-pointer hover:bg-nsp-teal/10 rounded-full p-1" />
-                                    <Icon icon="ph:gif" width="24" height="24" className="cursor-pointer hover:bg-nsp-teal/10 rounded-full p-1" />
+                                <div className="flex text-nsp-teal gap-2 relative z-20">
+                                    <div className="relative">
+                                        <button
+                                            onClick={() => {
+                                                setShowGifPicker(!showGifPicker);
+                                                setShowEmojiPicker(false);
+                                            }}
+                                            className={`p-2 rounded-full hover:bg-nsp-teal/10 transition-colors ${showGifPicker ? 'bg-nsp-teal/10' : ''}`}
+                                        >
+                                            <Icon icon="ph:gif" width="24" height="24" />
+                                        </button>
+                                        {showGifPicker && (
+                                            <div className="absolute top-10 left-0 shadow-xl z-50">
+                                                <div className="fixed inset-0 z-40" onClick={() => setShowGifPicker(false)} />
+                                                <div className="relative z-50">
+                                                    <GifPicker onSelect={handleGifSelect} onClose={() => setShowGifPicker(false)} />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="relative">
+                                        <button
+                                            onClick={() => {
+                                                setShowEmojiPicker(!showEmojiPicker);
+                                                setShowGifPicker(false);
+                                            }}
+                                            className={`p-2 rounded-full hover:bg-nsp-teal/10 transition-colors ${showEmojiPicker ? 'bg-nsp-teal/10' : ''}`}
+                                        >
+                                            <Icon icon="ph:smiley" width="24" height="24" />
+                                        </button>
+                                        {showEmojiPicker && (
+                                            <div className="absolute top-10 left-0 shadow-xl z-50 rounded-2xl">
+                                                <div className="fixed inset-0 z-40" onClick={() => setShowEmojiPicker(false)} />
+                                                <div className="relative z-50">
+                                                    <EmojiPicker
+                                                        onEmojiClick={handleEmojiClick}
+                                                        theme={Theme.LIGHT}
+                                                        width={300}
+                                                        height={400}
+                                                        previewConfig={{ showPreview: false }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                                 <button
                                     onClick={() => {
-                                        const input = document.getElementById('post-detail-reply-input') as HTMLTextAreaElement;
-                                        if (input && input.value.trim()) {
-                                            onReply(post.id, input.value);
-                                            input.value = '';
+                                        if (replyContent.trim() || mediaUrl) {
+                                            onReply(post.id, replyContent, mediaUrl || undefined, mediaType);
+                                            setReplyContent('');
+                                            clearMedia();
                                         }
                                     }}
-                                    className="px-4 py-1.5 bg-nsp-teal text-white font-bold rounded-full text-sm hover:bg-nsp-dark-teal transition-colors"
+                                    disabled={!replyContent.trim() && !mediaUrl}
+                                    className="px-4 py-1.5 bg-nsp-teal text-white font-bold rounded-full text-sm hover:bg-nsp-dark-teal transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     Reply
                                 </button>
@@ -203,10 +301,10 @@ const PostDetail: React.FC = () => {
         }
     };
 
-    const handleReply = async (id: string, content: string) => {
+    const handleReply = async (id: string, content: string, mediaUrl?: string, mediaType?: 'image' | 'video' | 'gif') => {
         if (!currentUser) return;
         try {
-            await createComment(id, currentUser.id, content);
+            await createComment(id, currentUser.id, content, undefined, mediaUrl, mediaType);
             addToast('success', 'Reply sent');
             // Reload comments
             const fetchedComments = await getComments(id);
@@ -231,10 +329,10 @@ const PostDetail: React.FC = () => {
         }
     };
 
-    const handleCommentReply = async (commentId: string, content: string) => {
+    const handleCommentReply = async (commentId: string, content: string, mediaUrl?: string, mediaType?: 'image' | 'video' | 'gif') => {
         if (!currentUser || !post) return;
         try {
-            await createComment(post.id, currentUser.id, content, commentId);
+            await createComment(post.id, currentUser.id, content, commentId, mediaUrl, mediaType);
             addToast('success', 'Reply sent');
             // Reload comments
             const fetchedComments = await getComments(post.id);

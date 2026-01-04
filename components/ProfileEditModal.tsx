@@ -3,6 +3,7 @@ import { Icon } from '@iconify/react';
 import { User } from '../types';
 import { updateUserProfile } from '../services/userService';
 import { uploadImage } from '../services/imageService';
+import Avatar from './Shared/Avatar';
 
 interface ProfileEditModalProps {
   isOpen: boolean;
@@ -18,10 +19,18 @@ const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
   onProfileUpdated
 }) => {
   const [avatar, setAvatar] = useState(user.avatar || '');
+  const [cover, setCover] = useState(user.cover_url || '');
   const [bio, setBio] = useState(user.bio || '');
   const [rank, setRank] = useState(user.rank || '');
+  const [location, setLocation] = useState(user.location || '');
+  const [website, setWebsite] = useState(user.website || '');
+  const [birthDate, setBirthDate] = useState(user.birth_date || '');
+
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [bioCharCount, setBioCharCount] = useState(0);
@@ -40,10 +49,17 @@ const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setAvatar(user.avatar || '');
+      setCover(user.cover_url || '');
       setBio(user.bio || '');
       setRank(user.rank || '');
+      setLocation(user.location || '');
+      setWebsite(user.website || '');
+      setBirthDate(user.birth_date || '');
+
       setAvatarFile(null);
       setAvatarPreview(null);
+      setCoverFile(null);
+      setCoverPreview(null);
       setError(null);
       setBioCharCount((user.bio || '').length);
     }
@@ -57,13 +73,10 @@ const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       setError('Please select an image file');
       return;
     }
-
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       setError('Image must be less than 5MB');
       return;
@@ -72,10 +85,32 @@ const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
     setAvatarFile(file);
     setError(null);
 
-    // Generate preview
     const reader = new FileReader();
     reader.onloadend = () => {
       setAvatarPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setError('Please select an image file');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image must be less than 5MB');
+      return;
+    }
+
+    setCoverFile(file);
+    setError(null);
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setCoverPreview(reader.result as string);
     };
     reader.readAsDataURL(file);
   };
@@ -84,7 +119,6 @@ const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
     e.preventDefault();
     setError(null);
 
-    // Validate bio length
     if (bio.length > MAX_BIO_LENGTH) {
       setError(`Bio must be ${MAX_BIO_LENGTH} characters or less`);
       return;
@@ -94,16 +128,15 @@ const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
 
     try {
       let avatarUrl = avatar;
+      let coverUrl = cover;
 
-      // Upload new avatar if selected
       if (avatarFile) {
         try {
           avatarUrl = await uploadImage(avatarFile, user.id);
         } catch (uploadError) {
-          console.error('Failed to upload image:', uploadError);
-          // Check if it's an RLS error
+          console.error('Failed to upload avatar:', uploadError);
           if (uploadError instanceof Error && uploadError.message.includes('row-level security')) {
-            setError('Image upload is not configured yet. You can still update your bio and rank. See STORAGE_QUICK_SETUP.md to enable image uploads.');
+            setError('Image upload failing due to RLS. Check bucket setup.');
             setIsSubmitting(false);
             return;
           }
@@ -111,11 +144,28 @@ const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
         }
       }
 
-      // Update profile
+      if (coverFile) {
+        try {
+          coverUrl = await uploadImage(coverFile, user.id);
+        } catch (uploadError) {
+          console.error('Failed to upload cover:', uploadError);
+          if (uploadError instanceof Error && uploadError.message.includes('row-level security')) {
+            setError('Image upload failing due to RLS. Check bucket setup.');
+            setIsSubmitting(false);
+            return;
+          }
+          throw uploadError;
+        }
+      }
+
       const updates: Partial<User> = {
-        avatar: avatarUrl,
+        avatar: avatarUrl || null,
+        cover_url: coverUrl || null,
         bio: bio.trim() || null,
-        rank: rank || null
+        rank: rank || null,
+        location: location.trim() || null,
+        website: website.trim() || null,
+        birth_date: birthDate || null,
       };
 
       const updatedUser = await updateUserProfile(user.id, updates);
@@ -174,59 +224,117 @@ const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
             </div>
           )}
 
-          {/* Cover Image Placeholder */}
-          <div className="h-32 bg-gradient-to-r from-nsp-teal to-nsp-dark-teal rounded-lg mb-4"></div>
-
-          {/* Avatar */}
-          <div className="mb-6 -mt-16 px-4">
-            <div className="relative inline-block">
-              <img
-                src={avatarPreview || avatar || '/default-avatar.png'}
-                alt="Profile"
-                className="w-24 h-24 rounded-full border-4 border-white object-cover"
-              />
-              <label
-                htmlFor="avatar-upload"
-                className="absolute bottom-0 right-0 bg-nsp-teal text-white p-2 rounded-full cursor-pointer hover:bg-nsp-dark-teal transition-colors"
-              >
-                <Icon icon="ph:camera" width="16" height="16" />
+          {/* Cover Image Upload */}
+          <div className="relative h-32 bg-gray-200 rounded-lg mb-4 overflow-hidden group">
+            <div className={`absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors z-10 flex items-center justify-center`}>
+              <label htmlFor="cover-upload" className="cursor-pointer p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-colors">
+                <Icon icon="ph:camera-plus" width="24" height="24" />
                 <input
-                  id="avatar-upload"
+                  id="cover-upload"
                   type="file"
                   accept="image/*"
-                  onChange={handleAvatarChange}
+                  onChange={handleCoverChange}
                   className="hidden"
                   disabled={isSubmitting}
                 />
               </label>
             </div>
+            {coverPreview || cover ? (
+              <img src={coverPreview || cover} alt="Cover" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-r from-nsp-teal to-nsp-dark-teal" />
+            )}
+            {coverFile && <div className="absolute bottom-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full z-20">New</div>}
           </div>
 
+          {/* Avatar */}
+          <div className="mb-6 -mt-16 px-4 relative z-20">
+            <div className="relative inline-block group">
+              <div className="w-24 h-24 rounded-full border-4 border-white overflow-hidden bg-gray-100">
+                <Avatar
+                  user={null} // We are using direct src
+                  src={avatarPreview || avatar}
+                  alt="Profile"
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                  <label
+                    htmlFor="avatar-upload"
+                    className="cursor-pointer p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-colors"
+                  >
+                    <Icon icon="ph:camera-plus" width="20" height="20" />
+                    <input
+                      id="avatar-upload"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleAvatarChange}
+                      className="hidden"
+                      disabled={isSubmitting}
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Name (Standard Field) - Optional if we allowed name edit? User object has name. Let's stick to Bio etc. for now unless requested. */}
+
           {/* Bio */}
-          <div className="mb-6">
-            <label htmlFor="bio" className="block text-sm font-bold text-gray-900 mb-2">
-              Bio
-            </label>
+          <div className="mb-4">
+            <label htmlFor="bio" className="block text-sm font-bold text-gray-900 mb-2">Bio</label>
             <textarea
               id="bio"
               value={bio}
               onChange={(e) => setBio(e.target.value)}
               placeholder="Tell us about yourself..."
               maxLength={MAX_BIO_LENGTH}
-              rows={4}
+              rows={3}
               disabled={isSubmitting}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-nsp-teal focus:border-transparent resize-none disabled:bg-gray-50 disabled:cursor-not-allowed"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-nsp-teal focus:border-transparent resize-none"
             />
-            <div className="flex justify-between items-center mt-2">
-              <p className="text-xs text-gray-500">
-                Share your Scrabble journey, achievements, or favorite words
-              </p>
-              <p className={`text-sm font-medium ${
-                bioCharCount > MAX_BIO_LENGTH ? 'text-red-500' : 'text-gray-500'
-              }`}>
-                {bioCharCount}/{MAX_BIO_LENGTH}
-              </p>
-            </div>
+          </div>
+
+          {/* Location */}
+          <div className="mb-4">
+            <label htmlFor="location" className="block text-sm font-bold text-gray-900 mb-2">Location</label>
+            <input
+              id="location"
+              type="text"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="e.g. Lagos, Nigeria"
+              maxLength={30}
+              disabled={isSubmitting}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-nsp-teal focus:border-transparent"
+            />
+          </div>
+
+          {/* Website */}
+          <div className="mb-4">
+            <label htmlFor="website" className="block text-sm font-bold text-gray-900 mb-2">Website</label>
+            <input
+              id="website"
+              type="url"
+              value={website}
+              onChange={(e) => setWebsite(e.target.value)}
+              placeholder="e.g. https://example.com"
+              maxLength={100}
+              disabled={isSubmitting}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-nsp-teal focus:border-transparent"
+            />
+          </div>
+
+          {/* Birth Date */}
+          <div className="mb-6">
+            <label htmlFor="birthDate" className="block text-sm font-bold text-gray-900 mb-2">Birth Date</label>
+            <input
+              id="birthDate"
+              type="date"
+              value={birthDate}
+              onChange={(e) => setBirthDate(e.target.value)}
+              disabled={isSubmitting}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-nsp-teal focus:border-transparent"
+            />
           </div>
 
           {/* Rank */}
@@ -248,41 +356,6 @@ const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
                 </option>
               ))}
             </select>
-            <p className="text-xs text-gray-500 mt-2">
-              Your skill level in Scrabble
-            </p>
-          </div>
-
-          {/* Storage Warning */}
-          {avatarFile && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-              <div className="flex items-start gap-2">
-                <Icon icon="ph:warning" width="20" height="20" className="text-yellow-600 flex-shrink-0 mt-0.5" />
-                <div className="text-sm text-yellow-800">
-                  <p className="font-bold mb-1">Storage Setup Required</p>
-                  <p>
-                    If image upload fails, you need to set up storage policies in Supabase.
-                    See <code className="bg-yellow-100 px-1 rounded">STORAGE_QUICK_SETUP.md</code> for instructions.
-                    You can still update your bio and rank without uploading an image.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Info */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-start gap-2">
-              <Icon icon="ph:info" width="20" height="20" className="text-blue-500 flex-shrink-0 mt-0.5" />
-              <div className="text-sm text-blue-700">
-                <p className="font-bold mb-1">Profile Tips</p>
-                <ul className="list-disc list-inside space-y-1">
-                  <li>Use a clear profile picture</li>
-                  <li>Keep your bio concise and engaging</li>
-                  <li>Select your current Scrabble rank</li>
-                </ul>
-              </div>
-            </div>
           </div>
         </form>
       </div>

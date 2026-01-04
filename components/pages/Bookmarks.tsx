@@ -2,42 +2,108 @@ import React, { useState, useEffect } from 'react';
 import { Icon } from '@iconify/react';
 import SocialLayout from '../Layout/SocialLayout';
 import { useCurrentUser } from '../../hooks/useCurrentUser';
-import { getSavedPosts } from '../../services/postService';
+import { getSavedPosts, likePost, unlikePost, createComment, createReRack, deletePost } from '../../services/postService';
 import { Post } from '../../types';
 import PostCard from '../Social/PostCard';
 import { Link } from 'react-router-dom';
+import { useToast } from '../../contexts/ToastContext';
 
 const Bookmarks: React.FC = () => {
     const { profile: currentUser } = useCurrentUser();
+    const { addToast } = useToast();
     const [savedPosts, setSavedPosts] = useState<Post[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
+    const fetchSavedPosts = async () => {
+        if (!currentUser) return;
+
+        try {
+            setIsLoading(true);
+            const posts = await getSavedPosts(currentUser.id);
+            setSavedPosts(posts);
+        } catch (error) {
+            console.error('Error fetching saved posts:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const fetchSavedPosts = async () => {
-            if (!currentUser) return;
-
-            try {
-                setIsLoading(true);
-                const posts = await getSavedPosts(currentUser.id);
-                setSavedPosts(posts);
-            } catch (error) {
-                console.error('Error fetching saved posts:', error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
         fetchSavedPosts();
     }, [currentUser]);
 
-    const removePostFromList = (postId: string) => {
-        setSavedPosts(prev => prev.filter(p => p.id !== postId));
+    const handleLike = async (postId: string) => {
+        if (!currentUser) return;
+
+        // Optimistic update
+        setSavedPosts(prevPosts =>
+            prevPosts.map(post => {
+                if (post.id === postId) {
+                    const isLiked = post.is_liked_by_current_user;
+                    return {
+                        ...post,
+                        is_liked_by_current_user: !isLiked,
+                        likes_count: post.likes_count + (isLiked ? -1 : 1)
+                    };
+                }
+                return post;
+            })
+        );
+
+        try {
+            const post = savedPosts.find(p => p.id === postId);
+            if (post?.is_liked_by_current_user) {
+                await unlikePost(postId, currentUser.id);
+            } else {
+                await likePost(postId, currentUser.id);
+            }
+        } catch (error) {
+            console.error('Error toggling like:', error);
+            fetchSavedPosts(); // Revert on error
+            addToast('error', 'Failed to update like');
+        }
+    };
+
+    const handleReply = async (postId: string, content: string) => {
+        if (!currentUser) return;
+        try {
+            await createComment(postId, currentUser.id, content);
+            addToast('success', 'Reply sent');
+            fetchSavedPosts(); // Refresh to show updated comment count
+        } catch (error) {
+            console.error('Error replying:', error);
+            addToast('error', 'Failed to send reply');
+        }
+    };
+
+    const handleReRack = async (postId: string, type: 'simple' | 'quote', quoteText?: string) => {
+        if (!currentUser) return;
+        try {
+            await createReRack(postId, currentUser.id, quoteText);
+            addToast('success', 'Post Re-Racked!');
+            fetchSavedPosts();
+        } catch (error) {
+            console.error('Error re-racking:', error);
+            addToast('error', 'Failed to re-rack post');
+        }
+    };
+
+    const handleDelete = async (postId: string) => {
+        if (!currentUser) return;
+        try {
+            await deletePost(postId, currentUser.id);
+            setSavedPosts(prev => prev.filter(p => p.id !== postId));
+            addToast('success', 'Post deleted');
+        } catch (error) {
+            console.error('Error deleting post:', error);
+            addToast('error', 'Failed to delete post');
+        }
     };
 
     return (
         <SocialLayout>
             {/* Sticky Header */}
-            <div className="sticky top-[60px] md:top-[72px] z-30 bg-white/80 backdrop-blur-md border-b border-gray-100 px-4 py-3">
+            <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-gray-100 px-4 py-3">
                 <div className="flex items-center gap-3">
                     <Link to="/feed" className="md:hidden">
                         <Icon icon="ph:arrow-left-bold" className="text-gray-700" width="20" height="20" />
@@ -67,11 +133,22 @@ const Bookmarks: React.FC = () => {
                 ) : (
                     <div className="divide-y divide-gray-100">
                         {savedPosts.map(post => (
-                            <PostCard
+                            currentUser && <PostCard
                                 key={post.id}
                                 post={post}
-                                currentUserId={currentUser?.id || ''}
-                                onPostUpdated={() => { }} // Optional: refresh list if post changes
+                                currentUser={currentUser}
+                                onLike={() => handleLike(post.id)}
+                                onReply={handleReply}
+                                onReRack={handleReRack}
+                                onDelete={handleDelete}
+                                onPostUpdated={() => {
+                                    // If post unsaved, remove from list
+                                    if (post.is_saved_by_current_user) {
+                                        // Wait, if we unsave, is_saved becomes false.
+                                        // But we are in Bookmarks, so we should probably fetch or filter.
+                                        fetchSavedPosts();
+                                    }
+                                }}
                             />
                         ))}
                     </div>

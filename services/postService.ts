@@ -14,21 +14,26 @@ export interface PostService {
   deletePost(postId: string, userId: string): Promise<void>
   likePost(postId: string, userId: string): Promise<void>
   unlikePost(postId: string, userId: string): Promise<void>
-  createComment(postId: string, userId: string, content: string, parentCommentId?: string): Promise<Comment>
+  createComment(postId: string, userId: string, content: string, parentCommentId?: string, mediaUrl?: string, mediaType?: 'image' | 'video' | 'gif'): Promise<Comment>
   createReRack(postId: string, userId: string, quoteText?: string): Promise<Post>
   savePost(postId: string, userId: string): Promise<void>
   unsavePost(postId: string, userId: string): Promise<void>
   getSavedPosts(userId: string): Promise<Post[]>
   getTrends(limit?: number): Promise<{ tag: string; count: number }[]>
+  incrementImpressions(postId: string): Promise<void>
 }
 
 /**
  * Create a new post
  */
+// Update createPost signature
 export const createPost = async (
   userId: string,
   content: string,
-  imageUrls?: string[]
+  imageUrls?: string[],
+  scheduledFor?: Date,
+  pollId?: string,
+  mediaType: 'image' | 'video' | 'gif' = 'image'
 ): Promise<Post> => {
   // Check rate limit
   if (!rateLimiter.checkLimit(userId, 'post_creation')) {
@@ -46,9 +51,9 @@ export const createPost = async (
     throw new Error('Post content exceeds 280 character limit')
   }
 
-  // Validate content is not empty
-  if (!content.trim()) {
-    throw new Error('Post content cannot be empty')
+  // Validate content is not empty (unless it has media or poll)
+  if (!content.trim() && !imageUrls?.length && !pollId) {
+    throw new Error('Post must contain text, media, or a poll')
   }
 
   // Extract tags
@@ -60,7 +65,11 @@ export const createPost = async (
     .insert({
       user_id: userId,
       content: content.trim(),
-      is_rerack: false
+      is_rerack: false,
+      scheduled_for: scheduledFor ? scheduledFor.toISOString() : null,
+      poll_id: pollId || null,
+      media_type: mediaType,
+      impressions_count: 0
     })
     .select()
     .single()
@@ -141,10 +150,14 @@ export const createPost = async (
     created_at: postData.created_at,
     is_rerack: postData.is_rerack,
     original_post: undefined,
-    quote_text: undefined,
-    is_liked_by_current_user: false
+    is_liked_by_current_user: false,
+    scheduled_for: postData.scheduled_for,
+    poll_id: postData.poll_id,
+    media_type: postData.media_type,
+    impressions_count: 0
   }
 }
+
 
 /**
  * Get posts with pagination
@@ -156,6 +169,7 @@ export const getPosts = async (
   currentUserId?: string,
   feedType: 'for-you' | 'following' = 'for-you'
 ): Promise<Post[]> => {
+  // Base query
   let query = supabase
     .from('posts')
     .select(`
@@ -167,6 +181,11 @@ export const getPosts = async (
       is_rerack,
       original_post_id,
       quote_text,
+      impressions_count,
+      scheduled_for,
+      poll_id,
+      media_type,
+      impressions_count,
       user:users!posts_user_id_fkey(
         id,
         handle,
@@ -175,6 +194,7 @@ export const getPosts = async (
         bio,
         rank,
         verified,
+        verification_type,
         created_at,
         updated_at
       ),
@@ -184,6 +204,7 @@ export const getPosts = async (
       )
     `)
     .order('created_at', { ascending: false })
+    .or(`scheduled_for.is.null,scheduled_for.lte.${new Date().toISOString()}`)
     .range(offset, offset + limit - 1)
 
   // Apply 'Following' filter
@@ -237,6 +258,20 @@ export const getPosts = async (
     .in('original_post_id', postIds)
     .eq('is_rerack', true)
 
+  // Fetch saved status for current user
+  let savedByCurrentUser = new Set<string>()
+  if (currentUserId) {
+    const { data: savedData } = await supabase
+      .from('saved_posts')
+      .select('post_id')
+      .eq('user_id', currentUserId)
+      .in('post_id', postIds)
+
+    if (savedData) {
+      savedByCurrentUser = new Set(savedData.map((item: any) => item.post_id))
+    }
+  }
+
   // Create count maps and liked posts set
   const likesCounts = likesData?.reduce((acc: any, like: any) => {
     acc[like.post_id] = (acc[like.post_id] || 0) + 1
@@ -276,6 +311,7 @@ export const getPosts = async (
         is_rerack,
         original_post_id,
         quote_text,
+        impressions_count,
         user:users!posts_user_id_fkey(
           id,
           handle,
@@ -284,6 +320,7 @@ export const getPosts = async (
           bio,
           rank,
           verified,
+          verification_type,
           created_at,
           updated_at
         ),
@@ -311,7 +348,7 @@ export const getPosts = async (
         originalPost = {
           id: originalData.id,
           user_id: originalData.user_id,
-          user: originalData.user,
+          user: Array.isArray(originalData.user) ? originalData.user[0] : originalData.user,
           content: originalData.content,
           images: originalData.post_images
             ?.sort((a: any, b: any) => a.position - b.position)
@@ -323,7 +360,9 @@ export const getPosts = async (
           is_rerack: originalData.is_rerack,
           original_post: undefined,
           quote_text: originalData.quote_text,
-          is_liked_by_current_user: likedByCurrentUser.has(originalData.id)
+          is_liked_by_current_user: likedByCurrentUser.has(originalData.id),
+          is_saved_by_current_user: savedByCurrentUser.has(originalData.id),
+          impressions_count: originalData.impressions_count || 0
         }
       }
     }
@@ -331,7 +370,7 @@ export const getPosts = async (
     return {
       id: post.id,
       user_id: post.user_id,
-      user: post.user,
+      user: Array.isArray(post.user) ? post.user[0] : post.user,
       content: post.content,
       images: post.post_images
         ?.sort((a: any, b: any) => a.position - b.position)
@@ -343,7 +382,9 @@ export const getPosts = async (
       is_rerack: post.is_rerack,
       original_post: originalPost,
       quote_text: post.quote_text,
-      is_liked_by_current_user: likedByCurrentUser.has(post.id)
+      is_liked_by_current_user: likedByCurrentUser.has(post.id),
+      is_saved_by_current_user: savedByCurrentUser.has(post.id),
+      impressions_count: post.impressions_count || 0
     }
   })
 }
@@ -363,6 +404,7 @@ export const getPostById = async (postId: string, currentUserId?: string): Promi
       is_rerack,
       original_post_id,
       quote_text,
+      impressions_count,
       user:users!posts_user_id_fkey(
         id,
         handle,
@@ -371,6 +413,7 @@ export const getPostById = async (postId: string, currentUserId?: string): Promi
         bio,
         rank,
         verified,
+        verification_type,
         created_at,
         updated_at
       ),
@@ -407,11 +450,32 @@ export const getPostById = async (postId: string, currentUserId?: string): Promi
     .select('post_id')
     .in('post_id', postIds);
 
+  // Fetch reracks counts
   const { data: reracksData } = await supabase
     .from('posts')
     .select('original_post_id')
     .in('original_post_id', postIds)
     .eq('is_rerack', true);
+
+  // Fetch saved status for current user
+  let isSaved = false;
+  let isOriginalSaved = false;
+
+  if (currentUserId) {
+    const { data: savedData } = await supabase
+      .from('saved_posts')
+      .select('post_id')
+      .eq('user_id', currentUserId)
+      .in('post_id', postIds);
+
+    if (savedData) {
+      const savedSet = new Set(savedData.map((item: any) => item.post_id));
+      isSaved = savedSet.has(postId);
+      if (postData.is_rerack && postData.original_post_id) {
+        isOriginalSaved = savedSet.has(postData.original_post_id);
+      }
+    }
+  }
 
   // Process counts
   const likesCounts = likesData?.reduce((acc: any, like: any) => {
@@ -447,6 +511,7 @@ export const getPostById = async (postId: string, currentUserId?: string): Promi
         is_rerack,
         original_post_id,
         quote_text,
+        impressions_count,
         user:users!posts_user_id_fkey(
           id,
           handle,
@@ -455,6 +520,7 @@ export const getPostById = async (postId: string, currentUserId?: string): Promi
           bio,
           rank,
           verified,
+          verification_type,
           created_at,
           updated_at
         ),
@@ -482,7 +548,9 @@ export const getPostById = async (postId: string, currentUserId?: string): Promi
         is_rerack: originalData.is_rerack,
         original_post: undefined,
         quote_text: originalData.quote_text,
-        is_liked_by_current_user: likedByCurrentUser.has(originalData.id)
+        is_liked_by_current_user: likedByCurrentUser.has(originalData.id),
+        is_saved_by_current_user: isOriginalSaved,
+        impressions_count: originalData.impressions_count || 0
       };
     }
   }
@@ -503,7 +571,9 @@ export const getPostById = async (postId: string, currentUserId?: string): Promi
     is_rerack: postData.is_rerack,
     original_post: originalPost,
     quote_text: postData.quote_text,
-    is_liked_by_current_user: likedByCurrentUser.has(postData.id)
+    is_liked_by_current_user: likedByCurrentUser.has(postData.id),
+    is_saved_by_current_user: isSaved,
+    impressions_count: postData.impressions_count || 0
   };
 }
 
@@ -595,11 +665,13 @@ export const createComment = async (
   postId: string,
   userId: string,
   content: string,
-  parentCommentId?: string
+  parentCommentId?: string,
+  mediaUrl?: string,
+  mediaType?: 'image' | 'video' | 'gif'
 ): Promise<Comment> => {
-  // Validate content is not empty
-  if (!content.trim()) {
-    throw new Error('Comment content cannot be empty')
+  // Validate content is not empty (unless media is present)
+  if (!content.trim() && !mediaUrl) {
+    throw new Error('Comment must contain text or media')
   }
 
   // Insert comment into database
@@ -609,7 +681,9 @@ export const createComment = async (
       post_id: postId,
       user_id: userId,
       content: content.trim(),
-      parent_comment_id: parentCommentId || null
+      parent_comment_id: parentCommentId || null,
+      media_url: mediaUrl || null,
+      media_type: mediaType || null
     })
     .select()
     .single()
@@ -638,7 +712,9 @@ export const createComment = async (
     content: commentData.content,
     parent_comment_id: commentData.parent_comment_id,
     created_at: commentData.created_at,
-    replies: []
+    replies: [],
+    media_url: commentData.media_url,
+    media_type: commentData.media_type
   }
 }
 
@@ -656,6 +732,8 @@ export const getComments = async (postId: string): Promise<Comment[]> => {
       content,
       parent_comment_id,
       created_at,
+      media_url,
+      media_type,
       user:users!comments_user_id_fkey(
         id,
         handle,
@@ -664,6 +742,7 @@ export const getComments = async (postId: string): Promise<Comment[]> => {
         bio,
         rank,
         verified,
+        verification_type,
         created_at,
         updated_at
       )
@@ -693,7 +772,9 @@ export const getComments = async (postId: string): Promise<Comment[]> => {
       content: comment.content,
       parent_comment_id: comment.parent_comment_id,
       created_at: comment.created_at,
-      replies: []
+      replies: [],
+      media_url: comment.media_url,
+      media_type: comment.media_type
     }
     commentsMap.set(comment.id, commentObj)
   })
@@ -780,6 +861,7 @@ export const createReRack = async (
       is_rerack,
       original_post_id,
       quote_text,
+      impressions_count,
       user:users!posts_user_id_fkey(
         id,
         handle,
@@ -788,6 +870,7 @@ export const createReRack = async (
         bio,
         rank,
         verified,
+        verification_type,
         created_at,
         updated_at
       ),
@@ -819,7 +902,8 @@ export const createReRack = async (
     is_rerack: originalPostData.is_rerack,
     original_post: undefined,
     quote_text: originalPostData.quote_text,
-    is_liked_by_current_user: false
+    is_liked_by_current_user: false,
+    impressions_count: originalPostData.impressions_count || 0
   }
 
   // Return the complete re-rack post object
@@ -828,7 +912,7 @@ export const createReRack = async (
     user_id: rerackData.user_id,
     user: userData,
     content: rerackData.content,
-    images: [], // Re-racks don't have their own images
+    images: [],
     likes_count: 0,
     comments_count: 0,
     reracks_count: 0,
@@ -836,8 +920,214 @@ export const createReRack = async (
     is_rerack: rerackData.is_rerack,
     original_post: originalPostObj,
     quote_text: rerackData.quote_text,
-    is_liked_by_current_user: false
+    is_liked_by_current_user: false,
+    impressions_count: 0
   }
+}
+
+/**
+ * Search posts by content
+ */
+export const searchPosts = async (
+  searchQuery: string,
+  limit: number = 20,
+  currentUserId?: string
+): Promise<Post[]> => {
+  if (!searchQuery.trim()) return []
+
+  // Base query with search filter
+  const { data: postsData, error: postsError } = await supabase
+    .from('posts')
+    .select(`
+      id,
+      user_id,
+      content,
+      created_at,
+      updated_at,
+      is_rerack,
+      original_post_id,
+      quote_text,
+      impressions_count,
+      user:users!posts_user_id_fkey(
+        id,
+        handle,
+        name,
+        avatar,
+        bio,
+        rank,
+        verified,
+        verification_type,
+        created_at,
+        updated_at
+      ),
+      post_images(
+        image_url,
+        position
+      )
+    `)
+    .ilike('content', `%${searchQuery}%`)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (postsError) {
+    throw new Error(`Failed to search posts: ${postsError.message}`)
+  }
+
+  if (!postsData || postsData.length === 0) {
+    return []
+  }
+
+  // Get post IDs for batch fetching engagement counts
+  const postIds = postsData.map((post: any) => post.id)
+
+  // Fetch likes counts
+  const { data: likesData } = await supabase
+    .from('likes')
+    .select('post_id, user_id')
+    .in('post_id', postIds)
+
+  // Fetch comments counts
+  const { data: commentsData } = await supabase
+    .from('comments')
+    .select('post_id')
+    .in('post_id', postIds)
+
+  // Fetch reracks counts
+  const { data: reracksData } = await supabase
+    .from('posts')
+    .select('original_post_id')
+    .in('original_post_id', postIds)
+    .eq('is_rerack', true)
+
+  // Fetch saved status for current user
+  let savedByCurrentUser = new Set<string>()
+  if (currentUserId) {
+    const { data: savedData } = await supabase
+      .from('saved_posts')
+      .select('post_id')
+      .eq('user_id', currentUserId)
+      .in('post_id', postIds)
+
+    if (savedData) {
+      savedByCurrentUser = new Set(savedData.map((item: any) => item.post_id))
+    }
+  }
+
+  // Create count maps and liked posts set
+  const likesCounts = likesData?.reduce((acc: any, like: any) => {
+    acc[like.post_id] = (acc[like.post_id] || 0) + 1
+    return acc
+  }, {}) || {}
+
+  const likedByCurrentUser = new Set(
+    likesData?.filter((like: any) => like.user_id === currentUserId).map((like: any) => like.post_id) || []
+  )
+
+  const commentsCounts = commentsData?.reduce((acc: any, comment: any) => {
+    acc[comment.post_id] = (acc[comment.post_id] || 0) + 1
+    return acc
+  }, {}) || {}
+
+  const reracksCounts = reracksData?.reduce((acc: any, rerack: any) => {
+    acc[rerack.original_post_id] = (acc[rerack.original_post_id] || 0) + 1
+    return acc
+  }, {}) || {}
+
+  // Fetch original posts for re-racks
+  const rerackPostIds = postsData
+    .filter((post: any) => post.is_rerack && post.original_post_id)
+    .map((post: any) => post.original_post_id)
+
+  let originalPostsMap: Map<string, any> = new Map()
+
+  if (rerackPostIds.length > 0) {
+    const { data: originalPostsData } = await supabase
+      .from('posts')
+      .select(`
+        id,
+        user_id,
+        content,
+        created_at,
+        updated_at,
+        is_rerack,
+        original_post_id,
+        quote_text,
+        impressions_count,
+        user:users!posts_user_id_fkey(
+        id,
+        handle,
+        name,
+        avatar,
+        bio,
+        rank,
+        verified,
+        verification_type,
+        created_at,
+        updated_at
+        ),
+        post_images(
+          image_url,
+          position
+        )
+      `)
+      .in('id', rerackPostIds)
+
+    if (originalPostsData) {
+      originalPostsData.forEach((originalPost: any) => {
+        originalPostsMap.set(originalPost.id, originalPost)
+      })
+    }
+  }
+
+  // Transform the data to match the Post type
+  return postsData.map((post: any) => {
+    let originalPost = undefined
+
+    if (post.is_rerack && post.original_post_id) {
+      const originalData = originalPostsMap.get(post.original_post_id)
+      if (originalData) {
+        originalPost = {
+          id: originalData.id,
+          user_id: originalData.user_id,
+          user: Array.isArray(originalData.user) ? originalData.user[0] : originalData.user,
+          content: originalData.content,
+          images: originalData.post_images
+            ?.sort((a: any, b: any) => a.position - b.position)
+            .map((img: any) => img.image_url) || [],
+          likes_count: likesCounts[originalData.id] || 0,
+          comments_count: commentsCounts[originalData.id] || 0,
+          reracks_count: reracksCounts[originalData.id] || 0,
+          created_at: originalData.created_at,
+          is_rerack: originalData.is_rerack,
+          original_post: undefined,
+          quote_text: originalData.quote_text,
+          is_liked_by_current_user: likedByCurrentUser.has(originalData.id),
+          is_saved_by_current_user: savedByCurrentUser.has(originalData.id),
+          impressions_count: originalData.impressions_count || 0
+        }
+      }
+    }
+
+    return {
+      id: post.id,
+      user_id: post.user_id,
+      user: Array.isArray(post.user) ? post.user[0] : post.user,
+      content: post.content,
+      images: post.post_images
+        ?.sort((a: any, b: any) => a.position - b.position)
+        .map((img: any) => img.image_url) || [],
+      likes_count: likesCounts[post.id] || 0,
+      comments_count: commentsCounts[post.id] || 0,
+      reracks_count: reracksCounts[post.id] || 0,
+      created_at: post.created_at,
+      is_rerack: post.is_rerack,
+      original_post: originalPost,
+      quote_text: post.quote_text,
+      is_liked_by_current_user: likedByCurrentUser.has(post.id),
+      is_saved_by_current_user: savedByCurrentUser.has(post.id),
+      impressions_count: post.impressions_count || 0
+    }
+  })
 }
 
 /**
@@ -871,6 +1161,7 @@ export const subscribeToNewPosts = (
               is_rerack,
               original_post_id,
               quote_text,
+              impressions_count,
               user:users!posts_user_id_fkey(
                 id,
                 handle,
@@ -879,6 +1170,7 @@ export const subscribeToNewPosts = (
                 bio,
                 rank,
                 verified,
+                verification_type,
                 created_at,
                 updated_at
               ),
@@ -1024,6 +1316,7 @@ export const subscribeToComments = (
                 bio,
                 rank,
                 verified,
+                verification_type,
                 created_at,
                 updated_at
               )
@@ -1173,6 +1466,7 @@ export const getSavedPosts = async (userId: string): Promise<Post[]> => {
       is_rerack,
       original_post_id,
       quote_text,
+      impressions_count,
       user:users!posts_user_id_fkey(
         id,
         handle,
@@ -1181,6 +1475,7 @@ export const getSavedPosts = async (userId: string): Promise<Post[]> => {
         bio,
         rank,
         verified,
+        verification_type,
         created_at,
         updated_at
       ),
@@ -1257,7 +1552,8 @@ export const getSavedPosts = async (userId: string): Promise<Post[]> => {
       is_rerack: post.is_rerack,
       original_post: originalPost,
       quote_text: post.quote_text,
-      is_liked_by_current_user: likedByCurrentUser.has(post.id)
+      is_liked_by_current_user: likedByCurrentUser.has(post.id),
+      impressions_count: post.impressions_count || 0
     }
   })
 }
@@ -1290,4 +1586,15 @@ export const getTrends = async (limit: number = 5): Promise<{ tag: string; count
     .map(([tag, count]) => ({ tag: `#${tag}`, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, limit);
+}
+
+/**
+ * Increment post impressions
+ */
+export const incrementImpressions = async (postId: string): Promise<void> => {
+  const { error } = await supabase.rpc('increment_impressions', { p_post_id: postId })
+  if (error) {
+    console.error('Error incrementing impressions:', error)
+    // Don't throw for impressions, just log
+  }
 }

@@ -7,6 +7,7 @@ import { getNotifications, markAllNotificationsAsRead, markNotificationAsRead, N
 import { formatRelativeTime } from '../../utils/dateUtils';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useToast } from '../../contexts/ToastContext';
+import VerifiedBadge from '../Shared/VerifiedBadge';
 
 const NotificationItem: React.FC<{ notification: NotificationModel; onClick: () => void }> = ({ notification, onClick }) => {
     const getIcon = () => {
@@ -39,7 +40,7 @@ const NotificationItem: React.FC<{ notification: NotificationModel; onClick: () 
                         className="w-8 h-8 rounded-full object-cover"
                     />
                     <span className="font-bold text-gray-900">{notification.actor_name}</span>
-                    {notification.actor_verified && <Icon icon="ph:seal-check-fill" className="text-green-500" width="14" height="14" />}
+                    <VerifiedBadge user={{ verified: notification.actor_verified, verification_type: notification.actor_verification_type } as any} size={14} />
                     <span className="text-gray-500 text-sm">@{notification.actor_handle}</span>
                     <span className="text-gray-400 text-sm">· {formatRelativeTime(notification.created_at)}</span>
                 </div>
@@ -149,7 +150,7 @@ const Notifications: React.FC = () => {
     return (
         <SocialLayout>
             {/* Sticky Header */}
-            <div className="sticky top-[60px] md:top-[72px] z-30 bg-white/80 backdrop-blur-md border-b border-gray-100">
+            <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-gray-100">
                 <div className="px-4 py-3 flex items-center justify-between">
                     <h2 className="font-bold text-xl text-gray-900">Notifications</h2>
                     <button onClick={handleMarkAllRead} className="text-nsp-teal text-sm font-bold hover:underline">

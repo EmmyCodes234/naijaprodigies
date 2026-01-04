@@ -17,7 +17,7 @@ interface ToastProps {
     onClose: (id: string) => void;
 }
 
-const Toast: React.FC<ToastProps> = ({ toast, onClose }) => {
+const Toast = React.forwardRef<HTMLDivElement, ToastProps>(({ toast, onClose }, ref) => {
     useEffect(() => {
         if (toast.duration !== Infinity) {
             const timer = setTimeout(() => {
@@ -43,6 +43,7 @@ const Toast: React.FC<ToastProps> = ({ toast, onClose }) => {
 
     return (
         <motion.div
+            ref={ref}
             layout
             initial={{ opacity: 0, y: 50, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -64,6 +65,8 @@ const Toast: React.FC<ToastProps> = ({ toast, onClose }) => {
             </button>
         </motion.div>
     );
-};
+});
+
+Toast.displayName = 'Toast';
 
 export default Toast;

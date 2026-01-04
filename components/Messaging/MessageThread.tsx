@@ -3,6 +3,12 @@ import { Icon } from '@iconify/react';
 import { Conversation, Message, User } from '../../types';
 import { getMessages, sendMessage, markConversationAsRead, subscribeToMessages } from '../../services/messageService';
 import { format, isToday, isYesterday } from 'date-fns';
+import Avatar from '../Shared/Avatar';
+import VerifiedBadge from '../Shared/VerifiedBadge';
+import { uploadImages } from '../../services/imageService';
+import EmojiPicker, { EmojiClickData, EmojiStyle } from 'emoji-picker-react';
+import GifPicker from '../Shared/GifPicker';
+import { GifResult } from '../../services/gifService';
 
 interface MessageThreadProps {
   conversation: Conversation;
@@ -25,11 +31,19 @@ const MessageThread: React.FC<MessageThreadProps> = ({
   const [messageContent, setMessageContent] = useState('');
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showGifPicker, setShowGifPicker] = useState(false);
+  const [selectedMedia, setSelectedMedia] = useState<File | null>(null);
+  const [selectedGif, setSelectedGif] = useState<string | null>(null);
+  const [mediaPreview, setMediaPreview] = useState<string | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const otherParticipant = conversation.participants?.[0];
+  const otherParticipant = conversation.participants?.find((p: User) => p.id !== currentUser.id) || conversation.participants?.[0] || currentUser;
 
   // Fetch messages when conversation changes
   useEffect(() => {
@@ -39,7 +53,7 @@ const MessageThread: React.FC<MessageThreadProps> = ({
         const fetchedMessages = await getMessages(conversation.id, currentUser.id);
         setMessages(fetchedMessages);
         setError(null);
-        
+
         // Mark conversation as read
         await markConversationAsRead(conversation.id, currentUser.id);
       } catch (err) {
@@ -87,6 +101,36 @@ const MessageThread: React.FC<MessageThreadProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Handlers for dynamic features
+  const handleEmojiClick = (emojiData: EmojiClickData) => {
+    setMessageContent(prev => prev + emojiData.emoji);
+    setShowEmojiPicker(false);
+    inputRef.current?.focus();
+  };
+
+  const handleGifSelect = (gif: GifResult) => {
+    setSelectedGif(gif.url);
+    setMediaPreview(gif.url);
+    setShowGifPicker(false);
+    setSelectedMedia(null);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedMedia(file);
+      setMediaPreview(URL.createObjectURL(file));
+      setSelectedGif(null);
+    }
+  };
+
+  const removeMedia = () => {
+    setSelectedMedia(null);
+    setSelectedGif(null);
+    setMediaPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   // Handle sending a message
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,26 +144,68 @@ const MessageThread: React.FC<MessageThreadProps> = ({
     }
 
     try {
-      setIsSending(true);
       setError(null);
+      setIsSending(true);
 
+      let mediaUrl = selectedGif;
+      let mediaType: 'image' | 'video' | 'gif' | null = selectedGif ? 'gif' : null;
+
+      // Handle file upload if media is selected
+      if (selectedMedia) {
+        setIsUploading(true);
+        try {
+          const uploadedUrls = await uploadImages([selectedMedia], currentUser.id);
+          mediaUrl = uploadedUrls[0];
+          mediaType = selectedMedia.type.startsWith('image') ? 'image' : 'video';
+        } catch (uploadErr) {
+          console.error('Upload failed:', uploadErr);
+          setError('Failed to upload media');
+          setIsUploading(false);
+          setIsSending(false);
+          return;
+        } finally {
+          setIsUploading(false);
+        }
+      }
+
+      // Create optimistic message
+      const optimisticMessage: Message = {
+        id: `optimistic-${Date.now()}`,
+        conversation_id: conversation.id,
+        sender_id: currentUser.id,
+        content: messageContent.trim(),
+        media_url: mediaUrl,
+        media_type: mediaType,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        sender: currentUser,
+        isOptimistic: true
+      };
+
+      // Push to UI immediately
+      setMessages((prev) => [...prev, optimisticMessage]);
+      setMessageContent('');
+      removeMedia();
+
+      // Reset height
+      if (inputRef.current) {
+        inputRef.current.style.height = '38px';
+      }
+
+      // Send to server
       const newMessage = await sendMessage(
         currentUser.id,
         otherParticipant.id,
-        messageContent.trim()
+        optimisticMessage.content,
+        mediaUrl,
+        mediaType
       );
 
-      // Optimistic UI update
-      setMessages((prevMessages) => {
-        const exists = prevMessages.some(m => m.id === newMessage.id);
-        if (exists) return prevMessages;
-        return [...prevMessages, newMessage];
-      });
-
-      setMessageContent('');
-      inputRef.current?.focus();
+      // Replace optimistic message with real one
+      setMessages((prev) => prev.map(m => m.id === optimisticMessage.id ? newMessage : m));
     } catch (err) {
       console.error('Error sending message:', err);
+      setMessages((prev) => prev.filter(m => !m.id.startsWith('optimistic-')));
       setError(err instanceof Error ? err.message : 'Failed to send message');
     } finally {
       setIsSending(false);
@@ -129,7 +215,7 @@ const MessageThread: React.FC<MessageThreadProps> = ({
   // Handle textarea auto-resize
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setMessageContent(e.target.value);
-    
+
     // Auto-resize textarea
     e.target.style.height = 'auto';
     e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
@@ -138,7 +224,7 @@ const MessageThread: React.FC<MessageThreadProps> = ({
   // Format message timestamp
   const formatMessageTime = (timestamp: string) => {
     const date = new Date(timestamp);
-    
+
     if (isToday(date)) {
       return format(date, 'h:mm a');
     } else if (isYesterday(date)) {
@@ -159,35 +245,39 @@ const MessageThread: React.FC<MessageThreadProps> = ({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-md px-4 py-3 border-b border-gray-100">
-        <div className="flex items-center gap-3">
+      <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-md px-4 border-b border-gray-100 min-h-[53px] flex items-center">
+        <div className="flex items-center gap-3 w-full">
           {/* Back button for mobile */}
           <button
             onClick={onBack}
-            className="md:hidden p-2 hover:bg-gray-100 rounded-full transition-colors -ml-2"
+            className="md:hidden p-2 hover:bg-black/5 rounded-full transition-colors mr-1"
           >
-            <Icon icon="ph:arrow-left-bold" width="20" height="20" className="text-gray-700" />
+            <Icon icon="ph:arrow-left-bold" width="20" height="20" className="text-gray-900" />
           </button>
 
           {/* Participant Info */}
-          <img
-            src={otherParticipant.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherParticipant.handle}`}
-            alt={otherParticipant.name}
-            className="w-10 h-10 rounded-full object-cover"
-          />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1">
-              <span className="font-bold text-sm truncate">{otherParticipant.name}</span>
-              {otherParticipant.verified && (
-                <Icon icon="ph:seal-check-fill" className="text-green-500 flex-shrink-0" width="16" height="16" />
-              )}
+          <div className="flex items-center gap-3 cursor-pointer flex-1 min-w-0">
+            <Avatar
+              user={otherParticipant}
+              alt={otherParticipant?.name || 'User'}
+              className="w-8 h-8 rounded-full object-cover"
+            />
+            <div className="flex flex-col min-w-0">
+              <div className="flex items-center gap-1">
+                <span className="font-bold text-[15px] leading-tight truncate text-gray-900">
+                  {otherParticipant?.name || 'User'}
+                </span>
+                {otherParticipant && <VerifiedBadge user={otherParticipant} size={14} />}
+              </div>
+              <p className="text-[13px] text-gray-500 leading-tight truncate">
+                @{otherParticipant?.handle || 'unknown'}
+              </p>
             </div>
-            <p className="text-xs text-gray-500 truncate">@{otherParticipant.handle}</p>
           </div>
 
           {/* More options */}
-          <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-            <Icon icon="ph:info-bold" width="20" height="20" className="text-gray-700" />
+          <button className="p-2 hover:bg-black/5 rounded-full transition-colors">
+            <Icon icon="ph:info-bold" width="20" height="20" className="text-gray-900" />
           </button>
         </div>
       </div>
@@ -208,29 +298,50 @@ const MessageThread: React.FC<MessageThreadProps> = ({
           <div className="space-y-4">
             {messages.map((message, index) => {
               const isCurrentUser = message.sender_id === currentUser.id;
-              const showTimestamp = index === 0 || 
+              const showTimestamp = index === 0 ||
                 (new Date(message.created_at).getTime() - new Date(messages[index - 1].created_at).getTime()) > 300000; // 5 minutes
 
               return (
                 <div key={message.id}>
                   {showTimestamp && (
-                    <div className="text-center text-xs text-gray-400 my-4">
-                      {formatMessageTime(message.created_at)}
+                    <div className="flex justify-center my-6">
+                      <div className="px-3 py-1 text-[13px] text-gray-500 border-b border-transparent hover:bg-black/5 rounded-full cursor-default select-none transition-colors">
+                        {formatMessageTime(message.created_at)}
+                      </div>
                     </div>
                   )}
-                  
+
                   <div className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'}`}>
                     <div className={`max-w-[70%] ${isCurrentUser ? 'order-2' : 'order-1'}`}>
                       <div
                         className={`
-                          px-4 py-2 rounded-2xl break-words
-                          ${isCurrentUser 
-                            ? 'bg-nsp-teal text-white rounded-br-sm' 
-                            : 'bg-gray-100 text-gray-900 rounded-bl-sm'
+                            px-4 py-2 rounded-[20px] break-words
+                            ${isCurrentUser
+                            ? 'bg-nsp-teal text-white rounded-br-[4px]'
+                            : 'bg-black/5 text-gray-900 rounded-bl-[4px]'
                           }
-                        `}
+                          `}
                       >
-                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        {message.media_url && (
+                          <div className="mb-2 max-w-full overflow-hidden rounded-lg">
+                            {message.media_type === 'gif' || message.media_url.endsWith('.gif') ? (
+                              <img
+                                src={message.media_url}
+                                alt="GIF"
+                                className="w-full h-auto object-cover max-h-[300px]"
+                                loading="lazy"
+                              />
+                            ) : message.media_type === 'image' || message.media_url.match(/\.(jpeg|jpg|png|webp)$/i) ? (
+                              <img
+                                src={message.media_url}
+                                alt="Shared media"
+                                className="w-full h-auto object-cover max-h-[300px]"
+                                loading="lazy"
+                              />
+                            ) : null}
+                          </div>
+                        )}
+                        <p className="text-[15px] leading-normal whitespace-pre-wrap">{message.content}</p>
                       </div>
                     </div>
                   </div>
@@ -249,19 +360,101 @@ const MessageThread: React.FC<MessageThreadProps> = ({
         </div>
       )}
 
-      {/* Message Input */}
-      <div className="border-t border-gray-100 p-4">
-        <form onSubmit={handleSendMessage} className="flex items-end gap-2">
-          <div className="flex-1 relative">
+      {/* Message Input Area */}
+      <div className="border-t border-gray-100 p-3 relative">
+        {/* Media Preview */}
+        {mediaPreview && (
+          <div className="absolute bottom-full left-4 mb-2 p-2 bg-white rounded-xl shadow-lg border border-gray-100 animate-in fade-in slide-in-from-bottom-2 duration-200">
+            <div className="relative">
+              <img
+                src={mediaPreview}
+                alt="Selected media"
+                className="max-h-[120px] rounded-lg object-contain"
+              />
+              <button
+                onClick={removeMedia}
+                className="absolute -top-2 -right-2 bg-black/75 hover:bg-black/90 text-white rounded-full p-1 shadow-md transition-all"
+              >
+                <Icon icon="ph:x-bold" width="14" height="14" />
+              </button>
+            </div>
+            {isUploading && (
+              <div className="absolute inset-0 bg-white/50 flex items-center justify-center rounded-lg">
+                <Icon icon="line-md:loading-twotone-loop" width="24" height="24" className="text-nsp-teal" />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Picker Modals */}
+        {showEmojiPicker && (
+          <div className="absolute bottom-full right-4 mb-2 z-[100]">
+            <div className="fixed inset-0" onClick={() => setShowEmojiPicker(false)} />
+            <div className="relative shadow-2xl rounded-2xl overflow-hidden border border-gray-100">
+              <EmojiPicker
+                onEmojiClick={handleEmojiClick}
+                autoFocusSearch={false}
+                emojiStyle={EmojiStyle.NATIVE}
+                lazyLoadEmojis={true}
+              />
+            </div>
+          </div>
+        )}
+
+        {showGifPicker && (
+          <div className="absolute bottom-full left-4 mb-2 z-[100] w-[320px]">
+            <div className="fixed inset-0" onClick={() => setShowGifPicker(false)} />
+            <div className="relative">
+              <GifPicker
+                onSelect={handleGifSelect}
+                onClose={() => setShowGifPicker(false)}
+              />
+            </div>
+          </div>
+        )}
+
+        <form onSubmit={handleSendMessage} className="flex items-end gap-1">
+          {/* Action Icons */}
+          <div className="flex items-center gap-0.5 mb-1 mr-1">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              accept="image/*,video/*"
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="p-2 text-nsp-teal hover:bg-nsp-teal/10 rounded-full transition-colors"
+              title="Media"
+              disabled={isSending}
+            >
+              <Icon icon="ph:image-bold" width="20" height="20" />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowGifPicker(!showGifPicker);
+                setShowEmojiPicker(false);
+              }}
+              className={`p-2 rounded-full transition-colors ${showGifPicker ? 'text-nsp-teal bg-nsp-teal/10' : 'text-nsp-teal hover:bg-nsp-teal/10'}`}
+              title="GIF"
+              disabled={isSending}
+            >
+              <Icon icon="ph:gif-bold" width="20" height="20" />
+            </button>
+          </div>
+
+          <div className="flex-1 flex items-center bg-[#eff3f4] rounded-[22px] min-h-[38px] px-4 py-1.5 focus-within:bg-white focus-within:ring-1 focus-within:ring-nsp-teal transition-all">
             <textarea
               ref={inputRef}
               value={messageContent}
               onChange={handleTextareaChange}
-              placeholder={`Message @${otherParticipant.handle}`}
-              className="w-full px-4 py-3 pr-12 bg-gray-100 rounded-full resize-none focus:outline-none focus:ring-2 focus:ring-nsp-teal text-sm"
+              placeholder={`Start a new message`}
+              className="flex-1 bg-transparent resize-none border-none outline-none focus:ring-0 text-[15px] py-1 placeholder-gray-500 leading-normal text-black"
               rows={1}
               style={{ maxHeight: '120px' }}
-              disabled={isSending}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
@@ -269,21 +462,29 @@ const MessageThread: React.FC<MessageThreadProps> = ({
                 }
               }}
             />
-            
-            {/* Character count */}
-            <div className="absolute right-3 bottom-3 text-xs text-gray-400">
-              {messageContent.length}/1000
-            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowEmojiPicker(!showEmojiPicker);
+                setShowGifPicker(false);
+              }}
+              className={`p-1.5 rounded-full transition-colors ${showEmojiPicker ? 'text-nsp-teal bg-nsp-teal/10' : 'text-nsp-teal hover:bg-nsp-teal/10'}`}
+              title="Emoji"
+              disabled={isSending}
+            >
+              <Icon icon="ph:smiley-bold" width="20" height="20" />
+            </button>
           </div>
 
           <button
             type="submit"
-            disabled={!messageContent.trim() || isSending || messageContent.length > 1000}
+            disabled={(!messageContent.trim() && !selectedMedia && !selectedGif) || isSending || messageContent.length > 1000}
             className={`
-              p-3 rounded-full transition-all flex-shrink-0
-              ${messageContent.trim() && messageContent.length <= 1000 && !isSending
-                ? 'bg-nsp-teal hover:bg-nsp-dark-teal text-white' 
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              p-2 rounded-full transition-all flex-shrink-0 mb-0.5 ml-1
+              ${(messageContent.trim() || selectedMedia || selectedGif) && messageContent.length <= 1000 && !isSending
+                ? 'text-nsp-teal hover:bg-nsp-teal/10 cursor-pointer'
+                : 'text-nsp-teal/30 cursor-not-allowed'
               }
             `}
           >

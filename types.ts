@@ -20,6 +20,11 @@ export interface User {
   bio: string | null;
   rank: string | null;
   verified: boolean;
+  verification_type?: 'none' | 'green' | 'gold' | 'grey';
+  cover_url?: string | null;
+  website?: string | null;
+  location?: string | null;
+  birth_date?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -38,6 +43,11 @@ export interface Post {
   original_post?: Post;
   quote_text?: string;
   is_liked_by_current_user?: boolean;
+  scheduled_for?: string | null;
+  poll_id?: string | null;
+  media_type?: 'image' | 'video' | 'gif';
+  is_saved_by_current_user?: boolean;
+  impressions_count: number;
 }
 
 export interface Comment {
@@ -49,6 +59,8 @@ export interface Comment {
   parent_comment_id: string | null;
   created_at: string;
   replies?: Comment[];
+  media_url?: string;
+  media_type?: 'image' | 'video' | 'gif';
 }
 
 export interface Like {
@@ -89,8 +101,11 @@ export interface Message {
   sender_id: string;
   sender?: User;
   content: string;
+  media_url?: string | null;
+  media_type?: 'image' | 'video' | 'gif' | null;
   created_at: string;
   updated_at: string;
+  isOptimistic?: boolean;
 }
 
 // Notifications types

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { User } from '../../types';
 import { searchUsers } from '../../services/userService';
 import { getAvatarUrl } from '../../utils/userUtils';
+import VerifiedBadge from '../Shared/VerifiedBadge';
 
 interface NewMessageModalProps {
     isOpen: boolean;
@@ -86,7 +87,7 @@ const NewMessageModal: React.FC<NewMessageModalProps> = ({ isOpen, onClose, curr
                         <input
                             type="text"
                             placeholder="Search people"
-                            className="w-full text-lg outline-none placeholder-gray-400"
+                            className="w-full text-lg outline-none placeholder-gray-400 text-black"
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
                             autoFocus
@@ -113,7 +114,7 @@ const NewMessageModal: React.FC<NewMessageModalProps> = ({ isOpen, onClose, curr
                                     <div className="flex-1">
                                         <div className="flex items-center gap-1">
                                             <span className="font-bold text-gray-900">{user.name}</span>
-                                            {user.verified && <Icon icon="ph:seal-check-fill" className="text-nsp-teal" width="16" height="16" />}
+                                            <VerifiedBadge user={user} size={16} />
                                         </div>
                                         <span className="text-gray-500 text-sm">@{user.handle}</span>
                                     </div>

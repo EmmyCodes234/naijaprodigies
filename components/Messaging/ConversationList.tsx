@@ -1,7 +1,9 @@
 import React from 'react';
 import { Icon } from '@iconify/react';
 import { Conversation } from '../../types';
-import { formatDistanceToNow } from 'date-fns';
+import { formatRelativeTime } from '../../utils/dateUtils';
+import Avatar from '../Shared/Avatar';
+import VerifiedBadge from '../Shared/VerifiedBadge';
 
 interface ConversationListProps {
   conversations: Conversation[];
@@ -22,7 +24,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
   onSelectConversation,
   currentUserId
 }) => {
-  
+
   if (conversations.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center p-8">
@@ -40,7 +42,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
       {conversations.map((conversation) => {
         // Get the other participant (not the current user)
         const otherParticipant = conversation.participants?.[0];
-        
+
         if (!otherParticipant) {
           return null;
         }
@@ -55,14 +57,17 @@ const ConversationList: React.FC<ConversationListProps> = ({
             key={conversation.id}
             onClick={() => onSelectConversation(conversation.id)}
             className={`
-              flex items-start gap-3 p-4 cursor-pointer transition-colors border-b border-gray-100
-              ${isSelected ? 'bg-gray-50' : 'hover:bg-gray-50'}
+              flex items-start gap-3 p-4 cursor-pointer transition-colors border-b border-gray-50 relative
+              ${isSelected ? 'bg-black/[0.02]' : 'hover:bg-black/[0.02]'}
             `}
           >
+            {isSelected && (
+              <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-nsp-teal" />
+            )}
             {/* Avatar */}
             <div className="relative flex-shrink-0">
-              <img
-                src={otherParticipant.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${otherParticipant.handle}`}
+              <Avatar
+                user={otherParticipant}
                 alt={otherParticipant.name}
                 className="w-12 h-12 rounded-full object-cover"
               />
@@ -78,17 +83,15 @@ const ConversationList: React.FC<ConversationListProps> = ({
                   <span className={`font-bold text-sm truncate ${hasUnread ? 'text-gray-900' : 'text-gray-900'}`}>
                     {otherParticipant.name}
                   </span>
-                  {otherParticipant.verified && (
-                    <Icon icon="ph:seal-check-fill" className="text-green-500 flex-shrink-0" width="16" height="16" />
-                  )}
+                  <VerifiedBadge user={otherParticipant} size={16} />
                   <span className="text-gray-500 text-sm truncate">
                     @{otherParticipant.handle}
                   </span>
                 </div>
-                
+
                 {lastMessage && (
-                  <span className="text-xs text-gray-500 flex-shrink-0 ml-2">
-                    {formatDistanceToNow(new Date(lastMessage.created_at), { addSuffix: false })}
+                  <span className="text-[14px] text-gray-500 flex-shrink-0 ml-2">
+                    {formatRelativeTime(lastMessage.created_at)}
                   </span>
                 )}
               </div>
