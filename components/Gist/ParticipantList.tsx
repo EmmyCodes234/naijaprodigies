@@ -30,7 +30,7 @@ const ParticipantList: React.FC<ParticipantListProps> = ({ isOpen, onClose }) =>
     const canManage = role === 'host' || role === 'co-host';
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center bg-black/70 backdrop-blur-xl p-4 animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center bg-black/70 backdrop-blur-xl p-4 animate-in fade-in duration-300 pb-safe">
             <div className="bg-[#052120] w-full max-w-lg rounded-[2.5rem] border border-white/5 flex flex-col max-h-[85vh] shadow-[0_30px_60px_rgba(0,0,0,0.6)] animate-in slide-in-from-bottom-20 duration-500 font-sans overflow-hidden">
                 {/* Header */}
                 <div className="p-6 border-b border-white/5 flex items-center justify-between bg-[#0f3c3a]/20">

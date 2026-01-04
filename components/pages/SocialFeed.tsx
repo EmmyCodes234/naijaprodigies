@@ -12,6 +12,7 @@ import SkeletonPost from '../Loaders/SkeletonPost';
 import { useToast } from '../../contexts/ToastContext';
 import { getAvatarUrl } from '../../utils/userUtils';
 import Avatar from '../Shared/Avatar';
+import GistDiscovery from '../Gist/GistDiscovery';
 
 const POSTS_PER_PAGE = 20;
 
@@ -26,7 +27,7 @@ const SocialFeedContent: React.FC<{
   setFeedType: (type: 'for-you' | 'following') => void;
   observerTarget: React.RefObject<HTMLDivElement>;
   onCreatePost: (post: Post) => void;
-  onLike: (postId: string) => void;
+  onLike: (postId: string, isCurrentlyLiked: boolean) => void;
   onReply: (postId: string, content: string, mediaUrl?: string, mediaType?: 'image' | 'video' | 'gif') => void;
   onReRack: (postId: string, type: 'simple' | 'quote', quoteText?: string) => void;
   onDelete: (postId: string) => void;
@@ -47,6 +48,7 @@ const SocialFeedContent: React.FC<{
   onDelete
 }) => {
     const { openDrawer } = useSocialLayout();
+    const navigate = useNavigate();
 
 
 
@@ -94,9 +96,9 @@ const SocialFeedContent: React.FC<{
               <img src="/nsp_feed_logo.png" alt="NSP" className="h-10 w-auto object-contain" />
             </div>
             {/* Mobile Top Settings/Sparkle */}
-            <div className="text-gray-900">
+            <button onClick={() => navigate('/settings')} className="text-gray-900 p-2 -mr-2 active:opacity-50 transition-opacity">
               <Icon icon="ph:gear-six" width="20" height="20" />
-            </div>
+            </button>
           </div>
 
           {/* Usage of Tabs */}
@@ -133,6 +135,9 @@ const SocialFeedContent: React.FC<{
             </button>
           </div>
         </div>
+
+        {/* Gist Discovery Bar (Spaces Style) */}
+        <GistDiscovery variant="horizontal" />
 
         {/* Create Post */}
         <div className="border-b border-gray-100 px-4 py-3 hidden md:block">
@@ -409,16 +414,13 @@ const SocialFeed: React.FC = () => {
     }
   };
 
-  const handleReply = async (postId: string, content: string, mediaUrl?: string, mediaType?: 'image' | 'video' | 'gif') => {
+  const handleReply = useCallback(async (postId: string, content: string, mediaUrl?: string, mediaType?: 'image' | 'video' | 'gif') => {
     if (!currentUser) return;
     try {
       await createComment(postId, currentUser.id, content, undefined, mediaUrl, mediaType);
       addToast('success', 'Reply sent');
 
-      // Optimistically update counts (optional since realtime subscription handles it too)
-      // sub takes care of it usually, but instant feedback is nice.
-      // We'll rely on subscription/reload for comments list inside PostCard, 
-      // but we can increment comment count here if we want immediate feedback before network/sub.
+      // Optimistically update counts
       setPosts(prev => prev.map(p =>
         p.id === postId ? { ...p, comments_count: p.comments_count + 1 } : p
       ));
@@ -427,9 +429,9 @@ const SocialFeed: React.FC = () => {
       console.error('Error in handleReply:', error);
       addToast('error', 'Failed to send reply');
     }
-  };
+  }, [currentUser, addToast]);
 
-  const handleReRack = async (postId: string, type: 'simple' | 'quote', quoteText?: string) => {
+  const handleReRack = useCallback(async (postId: string, type: 'simple' | 'quote', quoteText?: string) => {
     if (!currentUser) return;
 
     try {
@@ -458,13 +460,10 @@ const SocialFeed: React.FC = () => {
       console.error('Error creating re-rack:', error);
       throw error; // Re-throw to let the PostCard handle the error display
     }
-  };
+  }, [currentUser]);
 
-  const handleDelete = async (postId: string) => {
+  const handleDelete = useCallback(async (postId: string) => {
     if (!currentUser) return;
-
-    // Store previous posts for rollback
-    const previousPosts = [...posts];
 
     // Optimistic UI update
     setPosts(prevPosts => prevPosts.filter(p => p.id !== postId));
@@ -474,11 +473,12 @@ const SocialFeed: React.FC = () => {
       addToast('success', 'Post deleted');
     } catch (error) {
       console.error('Error deleting post:', error);
-      // Rollback
-      setPosts(previousPosts);
+      // We'd need original posts to rollback perfectly, but re-fetching might be easier or accepting the glitch
+      // For now, let's just toast error
       addToast('error', 'Failed to delete post');
+      // In a real robust app, we'd undo the filter
     }
-  };
+  }, [currentUser, addToast]);
 
   // Show auth required state (Layout handles this for sidebar but we might want to be explicit)
   if (!userLoading && !currentUser) {

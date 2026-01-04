@@ -20,7 +20,7 @@ import VerifiedBadge from '../Shared/VerifiedBadge';
 interface PostCardProps {
   post: Post;
   currentUser: User;
-  onLike: (id: string) => void;
+  onLike: (id: string, isCurrentlyLiked: boolean) => void;
   onReply: (postId: string, content: string, mediaUrl?: string, mediaType?: 'image' | 'video' | 'gif') => void;
   onReRack?: (postId: string, type: 'simple' | 'quote', quoteText?: string) => void;
   onDelete?: (postId: string) => void;
@@ -405,7 +405,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onReply,
             <>
               {post.media_type === 'gif' ? (
                 <div className="mb-2 mt-2 rounded-2xl overflow-hidden border border-gray-200">
-                  <img src={post.images[0]} alt="GIF" className="w-full h-auto object-cover max-h-[500px]" />
+                  <img src={post.images[0]} alt="GIF" className="w-full h-auto object-cover max-h-[500px]" loading="lazy" />
                   <div className="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded font-bold">GIF</div>
                 </div>
               ) : post.media_type === 'video' ? (
@@ -421,7 +421,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onReply,
                   {/* Simplified Grid: 3 images handled as 2 cols, 2 rows? For now keep simple grid */}
                   {post.images.map((image, index) => (
                     <div key={index} className="overflow-hidden bg-gray-100">
-                      <img src={image} alt={`Post media ${index + 1}`} className="w-full h-full object-cover min-h-[200px]" />
+                      <img src={image} alt={`Post media ${index + 1}`} className="w-full h-full object-cover min-h-[200px]" loading="lazy" />
                     </div>
                   ))}
                 </div>
@@ -473,14 +473,15 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onReply,
               )}
             </div>
 
+  // ... inside return ...
             {/* Like */}
-            <div className="group flex items-center gap-1 cursor-pointer -ml-2" onClick={(e) => { e.stopPropagation(); onLike(post.id); }}>
+            <div className="group flex items-center gap-1 cursor-pointer -ml-2" onClick={(e) => { e.stopPropagation(); onLike(post.id, !!post.is_liked_by_current_user); }}>
               <div className="p-2 rounded-full group-hover:bg-[#f91880]/10 text-gray-500 group-hover:text-[#f91880] transition-colors">
                 <Icon icon={post.is_liked_by_current_user ? "ph:heart-fill" : "ph:heart"} width="18" height="18" className={post.is_liked_by_current_user ? "text-[#f91880]" : ""} />
               </div>
               <span className={`text-[13px] ${post.is_liked_by_current_user ? "text-[#f91880]" : "text-gray-500 group-hover:text-[#f91880]"} transition-colors`}>{post.likes_count || ''}</span>
             </div>
-
+            {/* ... other code ... */}
             {/* View/Stats */}
             <div className="group flex items-center gap-1 cursor-pointer -ml-2">
               <div className="p-2 rounded-full group-hover:bg-[#1d9bf0]/10 text-gray-500 group-hover:text-[#1d9bf0] transition-colors">
@@ -603,8 +604,6 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onReply,
         </div>
       )}
 
-
-
       {/* Quote Re-Rack Modal */}
       {
         showQuoteModal && (
@@ -705,4 +704,4 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onReply,
   );
 };
 
-export default PostCard;
+export default React.memo(PostCard);

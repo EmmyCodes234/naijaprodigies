@@ -6,7 +6,11 @@ import Avatar from '../Shared/Avatar';
 import VerifiedBadge from '../Shared/VerifiedBadge';
 import { format } from 'date-fns';
 
-const GistDiscovery: React.FC = () => {
+interface GistDiscoveryProps {
+    variant?: 'vertical' | 'horizontal';
+}
+
+const GistDiscovery: React.FC<GistDiscoveryProps> = ({ variant = 'vertical' }) => {
     const {
         liveGists,
         scheduledGists,
@@ -27,6 +31,56 @@ const GistDiscovery: React.FC = () => {
         }
     };
 
+    // Horizontal Variant (Feed Header - Spaces Style)
+    if (variant === 'horizontal') {
+        return (
+            <div className="w-full overflow-x-auto no-scrollbar py-4 px-4 border-b border-gray-100 bg-white">
+                <div className="flex items-center gap-4 min-w-min">
+                    {/* Live Gists */}
+                    {liveGists.map((gist) => (
+                        <div
+                            key={gist.id}
+                            className="flex flex-col items-center gap-2 cursor-pointer group min-w-[72px]"
+                            onClick={() => joinGist(gist.id)}
+                        >
+                            <div className="relative p-[3px] rounded-full border-2 border-nsp-purple animate-pulse">
+                                <Avatar
+                                    user={gist.host}
+                                    className="w-[56px] h-[56px] rounded-full border-2 border-white object-cover"
+                                />
+                                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-nsp-purple text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-white whitespace-nowrap z-10">
+                                    LIVE
+                                </div>
+                            </div>
+                            <span className="text-xs font-bold text-gray-900 truncate max-w-[72px] text-center">
+                                {gist.host?.name?.split(' ')[0]}
+                            </span>
+                        </div>
+                    ))}
+
+                    {/* Scheduled Gists */}
+                    {scheduledGists.map((gist) => (
+                        <div key={gist.id} className="flex flex-col items-center gap-2 cursor-default min-w-[72px] opacity-70">
+                            <div className="relative p-[3px] rounded-full border-2 border-gray-200">
+                                <Avatar
+                                    user={gist.host}
+                                    className="w-[56px] h-[56px] rounded-full border-2 border-white object-cover grayscale"
+                                />
+                                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-gray-100 text-gray-600 text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-white whitespace-nowrap z-10">
+                                    {format(new Date(gist.scheduled_for!), 'MMM d')}
+                                </div>
+                            </div>
+                            <span className="text-xs font-medium text-gray-500 truncate max-w-[72px] text-center">
+                                {gist.host?.name?.split(' ')[0]}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    }
+
+    // Vertical Variant (Sidebar - Widget Style) - Existing Logic
     return (
         <div className="bg-[#0f1419] rounded-2xl border border-white/5 overflow-hidden shadow-xl mb-4 font-sans">
             <div
@@ -34,8 +88,8 @@ const GistDiscovery: React.FC = () => {
                 onClick={toggleDiscoveryCollapse}
             >
                 <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-[#f08920] rounded-full animate-pulse shadow-[0_0_8px_#f08920]"></div>
-                    <h3 className="font-extrabold text-xs uppercase tracking-[0.2em] text-[#f08920]">Live on NSP</h3>
+                    <div className="w-2 h-2 bg-nsp-purple rounded-full animate-pulse shadow-[0_0_8px_#8b5cf6]"></div>
+                    <h3 className="font-extrabold text-xs uppercase tracking-[0.2em] text-nsp-purple">Live on NSP</h3>
                 </div>
                 <Icon
                     icon="ph:caret-down-bold"
@@ -61,18 +115,18 @@ const GistDiscovery: React.FC = () => {
                                                 user={gist.host}
                                                 className="w-10 h-10 rounded-xl border border-white/10"
                                             />
-                                            <div className="absolute -bottom-1 -right-1 bg-[#f08920] rounded-md p-0.5 border-2 border-[#0f1419]">
-                                                <Icon icon="ph:microphone-fill" width="10" className="text-[#052120]" />
+                                            <div className="absolute -bottom-1 -right-1 bg-nsp-purple rounded-md p-0.5 border-2 border-[#0f1419]">
+                                                <Icon icon="ph:microphone-fill" width="10" className="text-white" />
                                             </div>
                                         </div>
                                         <div className="flex-1 min-w-0 pr-8">
-                                            <p className="font-bold text-sm text-white truncate group-hover:text-[#f08920] transition-colors">
+                                            <p className="font-bold text-sm text-white truncate group-hover:text-nsp-purple transition-colors">
                                                 {gist.title}
                                             </p>
                                             <div className="flex items-center gap-2 mt-1">
                                                 <span className="text-[10px] text-gray-400 font-medium">with</span>
                                                 <div className="flex items-center gap-1 min-w-0">
-                                                    <span className="text-[10px] font-bold text-nsp-teal truncate">
+                                                    <span className="text-[10px] font-bold text-gray-200 truncate">
                                                         {gist.host?.name}
                                                     </span>
                                                     <VerifiedBadge user={gist.host} size={10} />
@@ -91,8 +145,8 @@ const GistDiscovery: React.FC = () => {
                                                 <Icon icon="ph:trash-bold" width="14" />
                                             </button>
                                         )}
-                                        <div className="flex items-center gap-1 bg-nsp-red/10 px-2 py-0.5 rounded-full border border-nsp-red/20">
-                                            <span className="text-[8px] font-black text-nsp-red uppercase tracking-wider">Join</span>
+                                        <div className="flex items-center gap-1 bg-nsp-purple/10 px-2 py-0.5 rounded-full border border-nsp-purple/20">
+                                            <span className="text-[8px] font-black text-nsp-purple uppercase tracking-wider">Join</span>
                                         </div>
                                     </div>
                                 </div>
@@ -116,7 +170,7 @@ const GistDiscovery: React.FC = () => {
                                                     <p className="font-bold text-xs text-gray-400 truncate group-hover:text-white transition-colors">
                                                         {gist.title}
                                                     </p>
-                                                    <p className="text-[9px] text-[#f08920] font-black uppercase tracking-tight mt-0.5">
+                                                    <p className="text-[9px] text-nsp-purple font-black uppercase tracking-tight mt-0.5">
                                                         {gist.scheduled_for ? format(new Date(gist.scheduled_for), 'MMM d, h:mm a') : 'Coming Soon'}
                                                     </p>
                                                 </div>
@@ -131,7 +185,7 @@ const GistDiscovery: React.FC = () => {
                                                         </button>
                                                     )}
                                                     <button
-                                                        className="p-2 rounded-lg bg-white/5 hover:bg-[#f08920]/20 hover:text-[#f08920] text-gray-500 transition-all"
+                                                        className="p-2 rounded-lg bg-white/5 hover:bg-nsp-purple/20 hover:text-nsp-purple text-gray-500 transition-all"
                                                         title="Remind me"
                                                         onClick={(e) => {
                                                             e.stopPropagation();

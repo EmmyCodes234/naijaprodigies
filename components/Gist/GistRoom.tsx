@@ -19,7 +19,8 @@ const GistRoom: React.FC = () => {
         sendReaction,
         raiseHand,
         toggleMute,
-        deleteGist
+        deleteGist,
+        remoteStreams
     } = useGist();
     const { addToast } = useToast();
     const { profile } = useCurrentUser();
@@ -55,7 +56,7 @@ const GistRoom: React.FC = () => {
     };
 
     return (
-        <div className="fixed inset-0 z-[60] flex flex-col bg-[#052120] text-white animate-in slide-in-from-bottom-full duration-500 overflow-hidden font-sans">
+        <div className="fixed inset-0 z-[60] flex flex-col bg-[#052120] text-white animate-in slide-in-from-bottom-full duration-500 overflow-hidden font-sans pb-safe">
             {/* Reactions Layer */}
             <GistReactions />
 
@@ -269,6 +270,23 @@ const GistRoom: React.FC = () => {
                         </button>
                     </div>
                 </div>
+            </div>
+
+            {/* Audio Streams (Hidden) */}
+            <div className="hidden">
+                {Object.entries(remoteStreams || {}).map(([userId, stream]) => (
+                    <audio
+                        key={userId}
+                        ref={audio => {
+                            if (audio && stream) {
+                                audio.srcObject = stream;
+                                audio.play().catch(e => console.error("Audio play failed", e));
+                            }
+                        }}
+                        autoPlay
+                        playsInline
+                    />
+                ))}
             </div>
 
             {/* Overlays */}

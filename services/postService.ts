@@ -239,37 +239,23 @@ export const getPosts = async (
   // Get post IDs for batch fetching engagement counts
   const postIds = postsData.map((post: any) => post.id)
 
-  // Fetch likes counts
-  const { data: likesData } = await supabase
-    .from('likes')
-    .select('post_id, user_id')
-    .in('post_id', postIds)
-
-  // Fetch comments counts
-  const { data: commentsData } = await supabase
-    .from('comments')
-    .select('post_id')
-    .in('post_id', postIds)
-
-  // Fetch reracks counts (posts that reference these posts)
-  const { data: reracksData } = await supabase
-    .from('posts')
-    .select('original_post_id')
-    .in('original_post_id', postIds)
-    .eq('is_rerack', true)
+  // Fetch all related data in parallel
+  const [
+    { data: likesData },
+    { data: commentsData },
+    { data: reracksData },
+    savedDataResult
+  ] = await Promise.all([
+    supabase.from('likes').select('post_id, user_id').in('post_id', postIds),
+    supabase.from('comments').select('post_id').in('post_id', postIds),
+    supabase.from('posts').select('original_post_id').in('original_post_id', postIds).eq('is_rerack', true),
+    currentUserId ? supabase.from('saved_posts').select('post_id').eq('user_id', currentUserId).in('post_id', postIds) : Promise.resolve({ data: null })
+  ]);
 
   // Fetch saved status for current user
   let savedByCurrentUser = new Set<string>()
-  if (currentUserId) {
-    const { data: savedData } = await supabase
-      .from('saved_posts')
-      .select('post_id')
-      .eq('user_id', currentUserId)
-      .in('post_id', postIds)
-
-    if (savedData) {
-      savedByCurrentUser = new Set(savedData.map((item: any) => item.post_id))
-    }
+  if (savedDataResult.data) {
+    savedByCurrentUser = new Set(savedDataResult.data.map((item: any) => item.post_id))
   }
 
   // Create count maps and liked posts set

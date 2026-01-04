@@ -27,6 +27,8 @@ export interface User {
   birth_date?: string | null;
   created_at: string;
   updated_at: string;
+  following_count?: number;
+  followers_count?: number;
 }
 
 export interface Post {

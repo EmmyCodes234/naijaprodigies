@@ -31,7 +31,23 @@ export const getCurrentUser = async (): Promise<User | null> => {
     .single()
 
   if (error) throw error
-  return data
+
+  // Fetch counts
+  const { count: followingCount } = await supabase
+    .from('follows')
+    .select('*', { count: 'exact', head: true })
+    .eq('follower_id', authUser.id);
+
+  const { count: followersCount } = await supabase
+    .from('follows')
+    .select('*', { count: 'exact', head: true })
+    .eq('following_id', authUser.id);
+
+  return {
+    ...data,
+    following_count: followingCount || 0,
+    followers_count: followersCount || 0
+  }
 }
 
 /**

@@ -381,10 +381,10 @@ const SocialLayout: React.FC<SocialLayoutProps> = ({ children, showWidgets = tru
 
                                 <div className="flex gap-4 text-sm">
                                     <div className="hover:underline cursor-pointer group">
-                                        <span className="font-bold text-gray-900 group-hover:underline">204</span> <span className="text-gray-500">Following</span>
+                                        <span className="font-bold text-gray-900 group-hover:underline">{currentUser.following_count || 0}</span> <span className="text-gray-500">Following</span>
                                     </div>
                                     <div className="hover:underline cursor-pointer group">
-                                        <span className="font-bold text-gray-900 group-hover:underline">54</span> <span className="text-gray-500">Followers</span>
+                                        <span className="font-bold text-gray-900 group-hover:underline">{currentUser.followers_count || 0}</span> <span className="text-gray-500">Followers</span>
                                     </div>
                                 </div>
                             </div>
@@ -392,7 +392,7 @@ const SocialLayout: React.FC<SocialLayoutProps> = ({ children, showWidgets = tru
                             <nav className="space-y-1">
                                 {[
                                     { icon: 'ph:user-bold', label: 'Profile', path: currentUser ? `/profile/${currentUser.id}` : '#' },
-                                    { icon: 'ph:star-four-fill', label: 'NSP Premium', color: 'text-nsp-yellow', path: '#' },
+                                    { icon: 'ph:microphone-stage-bold', label: 'Gists', path: '#' },
                                     { icon: 'ph:hash-bold', label: 'Explore', path: '/explore' },
                                     { icon: 'ph:bookmark-simple-bold', label: 'Bookmarks', path: '/bookmarks' },
                                     { icon: 'ph:gear-bold', label: 'Settings', path: '/settings' },
@@ -400,14 +400,17 @@ const SocialLayout: React.FC<SocialLayoutProps> = ({ children, showWidgets = tru
                                     <button
                                         key={link.label}
                                         onClick={() => {
-                                            if (link.path !== '#') {
+                                            if (link.label === 'Gists') {
+                                                setIsCreateGistOpen(true);
+                                                setIsDrawerOpen(false);
+                                            } else if (link.path !== '#') {
                                                 navigate(link.path);
                                                 setIsDrawerOpen(false);
                                             }
                                         }}
                                         className="w-full flex items-center gap-4 py-3 px-4 -mx-4 hover:bg-gray-100 transition-colors"
                                     >
-                                        <Icon icon={link.icon} width="24" height="24" className={link.color || 'text-gray-900'} />
+                                        <Icon icon={link.icon} width="24" height="24" className={'text-gray-900'} />
                                         <span className="font-bold text-xl text-gray-900">{link.label}</span>
                                     </button>
                                 ))}

@@ -26,6 +26,7 @@
         ...((window.process && window.process.env) || {})
       }
     };
+    window.global = window; // Polyfill global for simple-peer
 
     tailwind.config = {
       theme: {

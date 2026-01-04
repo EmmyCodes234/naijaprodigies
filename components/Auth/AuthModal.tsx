@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { Icon } from '@iconify/react';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -14,7 +15,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, signInWithGoogle } = useAuth();
 
   if (!isOpen) return null;
 
@@ -140,6 +141,23 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           </button>
         </form>
 
+        <div className="flex items-center my-6">
+          <div className="flex-grow h-px bg-white/10"></div>
+          <span className="px-4 text-xs font-bold text-gray-500 uppercase tracking-widest">or</span>
+          <div className="flex-grow h-px bg-white/10"></div>
+        </div>
+
+        <button
+          onClick={async () => {
+            const { error } = await signInWithGoogle();
+            if (!error) onClose();
+          }}
+          className="w-full bg-white text-gray-900 font-bold py-3 rounded-lg flex items-center justify-center gap-3 hover:bg-gray-100 transition-colors"
+        >
+          <Icon icon="devicon:google" width="20" />
+          <span>Sign in with Google</span>
+        </button>
+
         <div className="mt-4 text-center">
           <button
             onClick={toggleMode}
@@ -149,7 +167,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           </button>
         </div>
       </div>
-    </div>
+    </div >
   );
 };
 
