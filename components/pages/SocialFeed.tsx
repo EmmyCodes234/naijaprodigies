@@ -32,6 +32,8 @@ const SocialFeedContent: React.FC<{
   onReply: (postId: string, content: string, mediaUrl?: string, mediaType?: 'image' | 'video' | 'gif') => void;
   onReRack: (postId: string, type: 'simple' | 'quote', quoteText?: string) => void;
   onDelete: (postId: string) => void;
+  pendingPostsCount: number;
+  onShowNewPosts: () => void;
 }> = ({
   currentUser,
   posts,
@@ -47,9 +49,12 @@ const SocialFeedContent: React.FC<{
   onLike,
   onReply,
   onReRack,
-  onDelete
+  onDelete,
+  pendingPostsCount,
+  onShowNewPosts
 }) => {
     const { openDrawer } = useSocialLayout();
+    const feedContainerRef = useRef<HTMLDivElement>(null);
     const navigate = useNavigate();
 
     // Show loading state (initial load only)
@@ -139,6 +144,17 @@ const SocialFeedContent: React.FC<{
         {/* Gist Discovery Bar (Spaces Style) */}
         <GistDiscovery variant="horizontal" />
 
+        {/* New Posts Banner (X.com Style) */}
+        {pendingPostsCount > 0 && (
+          <button
+            onClick={onShowNewPosts}
+            className="w-full py-3 px-4 bg-gradient-to-r from-nsp-teal/5 via-nsp-teal/10 to-nsp-teal/5 hover:from-nsp-teal/10 hover:via-nsp-teal/15 hover:to-nsp-teal/10 border-b border-nsp-teal/20 text-nsp-teal font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 group"
+          >
+            <Icon icon="ph:arrow-up-bold" className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" />
+            <span>Show {pendingPostsCount} new {pendingPostsCount === 1 ? 'post' : 'posts'}</span>
+          </button>
+        )}
+
         {/* Create Post */}
         <div className="border-b border-gray-100 px-4 py-3 hidden md:block">
           <CreatePost currentUser={currentUser} onPost={onCreatePost} />
@@ -202,6 +218,7 @@ const SocialFeed: React.FC = () => {
   const { addToast } = useToast();
   const [feedType, setFeedType] = useState<'for-you' | 'following'>('for-you');
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [pendingPosts, setPendingPosts] = useState<Post[]>([]);
   const queryClient = useQueryClient();
   const observerTarget = useRef<HTMLDivElement>(null);
 
@@ -286,19 +303,24 @@ const SocialFeed: React.FC = () => {
 
     const unsubscribeNewPosts = subscribeToNewPosts(
       (newPost) => {
-        queryClient.setQueryData(['posts', feedType, currentUser.id], (oldData: any) => {
-          if (!oldData) return { pages: [[newPost]], pageParams: [0] };
-          const firstPage = oldData.pages[0];
-          // Check if exists
-          if (firstPage.some((p: Post) => p.id === newPost.id)) return oldData;
-
-          // Prepend to first page
-          const newFirstPage = [newPost, ...firstPage];
-          return {
-            ...oldData,
-            pages: [newFirstPage, ...oldData.pages.slice(1)]
-          };
-        });
+        // If it's the current user's own post, add directly to feed
+        if (newPost.user_id === currentUser.id) {
+          queryClient.setQueryData(['posts', feedType, currentUser.id], (oldData: any) => {
+            if (!oldData) return { pages: [[newPost]], pageParams: [0] };
+            const firstPage = oldData.pages[0];
+            if (firstPage.some((p: Post) => p.id === newPost.id)) return oldData;
+            return {
+              ...oldData,
+              pages: [[newPost, ...firstPage], ...oldData.pages.slice(1)]
+            };
+          });
+        } else {
+          // For other users' posts, accumulate in pending state (X.com style)
+          setPendingPosts(prev => {
+            if (prev.some(p => p.id === newPost.id)) return prev;
+            return [newPost, ...prev];
+          });
+        }
       },
       (err) => console.error(err)
     );
@@ -476,6 +498,29 @@ const SocialFeed: React.FC = () => {
     deleteMutation.mutate(postId);
   };
 
+  // Handler to show pending new posts (X.com style banner behavior)
+  const handleShowNewPosts = useCallback(() => {
+    if (pendingPosts.length === 0) return;
+
+    // Prepend pending posts to the feed
+    queryClient.setQueryData(['posts', feedType, currentUser?.id], (oldData: any) => {
+      if (!oldData) return { pages: [pendingPosts], pageParams: [0] };
+      const existingIds = new Set(oldData.pages.flat().map((p: Post) => p.id));
+      const newPosts = pendingPosts.filter(p => !existingIds.has(p.id));
+      const firstPage = [...newPosts, ...oldData.pages[0]];
+      return {
+        ...oldData,
+        pages: [firstPage, ...oldData.pages.slice(1)]
+      };
+    });
+
+    // Clear pending posts
+    setPendingPosts([]);
+
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [pendingPosts, queryClient, feedType, currentUser?.id]);
+
   // Reply and ReRack (simplified for now, using legacy pattern or could move to mutation)
   // Keeping standard callback pattern but ensuring it invalidates or manually updates could help
   const handleReply = useCallback(async (postId: string, content: string, mediaUrl?: string, mediaType?: 'image' | 'video' | 'gif') => {
@@ -535,6 +580,8 @@ const SocialFeed: React.FC = () => {
         onReply={handleReply}
         onReRack={handleReRack}
         onDelete={handleDelete}
+        pendingPostsCount={pendingPosts.length}
+        onShowNewPosts={handleShowNewPosts}
       />
     </SocialLayout>
   );

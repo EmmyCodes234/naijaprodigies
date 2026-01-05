@@ -56,14 +56,24 @@ export const uploadImages = async (
     throw new Error('Must upload between 1 and 4 files')
   }
 
-  // Upload all images in parallel
+  // Upload all files in parallel
   const uploadPromises = files.map(file => uploadImage(file, userId))
 
   try {
     const urls = await Promise.all(uploadPromises)
+
+    // Validate that all URLs are actually valid URLs, not File objects
+    for (const url of urls) {
+      if (!url || typeof url !== 'string' || !url.startsWith('http')) {
+        console.error('Invalid URL returned from upload:', url);
+        throw new Error('Upload failed: Invalid URL received');
+      }
+    }
+
     return urls
   } catch (error) {
-    throw new Error(`Failed to upload images: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    console.error('Upload error:', error);
+    throw new Error(`Failed to upload files: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
 }
 
