@@ -482,11 +482,7 @@ export const getUnreadMessageCount = async (userId: string): Promise<number> => 
   return totalUnread;
 }
 
-// Return unsubscribe function
-return () => {
-  supabase.removeChannel(channel)
-}
-}
+
 
 /**
  * Attempt to decrypt a single message using the cached private key

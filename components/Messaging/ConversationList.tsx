@@ -102,9 +102,22 @@ const ConversationList: React.FC<ConversationListProps> = ({
                   {isCurrentUserSender && (
                     <span className="text-gray-500 text-sm flex-shrink-0">You:</span>
                   )}
-                  <p className={`text-sm truncate ${hasUnread ? 'font-semibold text-gray-900' : 'text-gray-500'}`}>
-                    {lastMessage.content}
-                  </p>
+                  {(() => {
+                    const isEncrypted = lastMessage.content.startsWith('{"k":') && lastMessage.content.includes('"c":');
+                    if (isEncrypted) {
+                      return (
+                        <div className="flex items-center gap-1 text-gray-500 italic">
+                          <Icon icon="ph:lock-key" width="12" height="12" />
+                          <span className="text-sm truncate">Encrypted message</span>
+                        </div>
+                      );
+                    }
+                    return (
+                      <p className={`text-sm truncate ${hasUnread ? 'font-semibold text-gray-900' : 'text-gray-500'}`}>
+                        {lastMessage.content}
+                      </p>
+                    );
+                  })()}
                 </div>
               )}
             </div>
