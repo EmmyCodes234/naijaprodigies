@@ -38,6 +38,7 @@ const Footer: React.FC = () => {
                 { label: 'Social Feed', path: '/feed' },
                 { label: 'Our Story', path: '/story' },
                 { label: 'Members', path: '/members' },
+                { label: 'Prodigy AI', path: '/prodigy' },
               ].map((link) => (
                 <li key={link.label}>
                   <Link to={link.path} className="text-gray-400 hover:text-nsp-orange transition-colors text-sm font-semibold uppercase tracking-wide">
@@ -45,9 +46,6 @@ const Footer: React.FC = () => {
                   </Link>
                 </li>
               ))}
-              <li>
-                <button className="text-gray-400 hover:text-nsp-orange transition-colors text-sm font-semibold uppercase tracking-wide">Word Wizard</button>
-              </li>
             </ul>
           </div>
 
@@ -111,9 +109,9 @@ const Footer: React.FC = () => {
             © {new Date().getFullYear()} Nigeria Scrabble Prodigies. All tiles reserved.
           </p>
           <div className="flex gap-8 text-sm text-gray-500 font-medium">
-            <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-white transition-colors">Terms</a>
-            <a href="#" className="hover:text-white transition-colors">Cookie Policy</a>
+            <Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
+            <Link to="/terms" className="hover:text-white transition-colors">Terms</Link>
+            <Link to="/cookie-policy" className="hover:text-white transition-colors">Cookie Policy</Link>
           </div>
         </div>
       </div>

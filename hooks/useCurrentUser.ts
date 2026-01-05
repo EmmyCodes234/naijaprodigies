@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 export const useCurrentUser = () => {
   const { user: authUser, loading: authLoading } = useAuth();
 
-  const { data: profile, isLoading, error } = useQuery({
+  const { data: profile, isLoading, error, refetch } = useQuery({
     queryKey: ['currentUser', authUser?.id],
     queryFn: getCurrentUser,
     enabled: !!authUser,
@@ -22,6 +22,8 @@ export const useCurrentUser = () => {
   return {
     profile: profile || null,
     loading,
-    error: error as Error | null
+    error: error as Error | null,
+    refetch
   };
 };
+

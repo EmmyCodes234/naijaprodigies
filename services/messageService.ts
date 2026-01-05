@@ -116,8 +116,8 @@ export const sendMessage = async (
     }
   } else {
     console.warn('Recipient has no public key. Sending plain text (NOT SECURE).');
-    // In strict E2EE, we should block this. For now, allow mixed mode or alert user.
-    // Let's prepend a warning marker/flag? Or just send plain.
+    // For now, we still allow plain text to avoid blocking communication during migration.
+    // In strict mode, we should: throw new Error("Recipient hasn't enabled Secure Messaging yet.");
   }
 
   // Insert message into database
@@ -141,7 +141,7 @@ export const sendMessage = async (
   return {
     ...messageData,
     sender: senderData,
-    isEncrypted: !!recipientKeyData?.public_key // Add a flag helper?
+    isEncrypted: !!recipientKeyData?.public_key
   }
 }
 
@@ -195,13 +195,13 @@ export const recoverKeys = async (userId: string, pin: string): Promise<boolean>
   if (error || !data) return false;
 
   try {
-    // Migration check: If I forgot IV, I might need to store it in the JSON blob of encrypted_private_key or migration update.
-    // Let's assume I need to fix migration if IV is missing.
-    // Assuming data.encrypted_private_key is the blob.
-    // If I stored IV in separate column, I need that column.
-
-    // Let's check migration content from previous step.
-    const privateKey = await crypto.unwrapPrivateKey(data.encrypted_private_key, data.salt, data.salt, pin); // Hack: reusing salt as IV if needed, but risky.
+    // Use the correct iv column from the database
+    const privateKey = await crypto.unwrapPrivateKey(
+      data.encrypted_private_key,
+      data.salt,
+      data.iv,  // Use the actual IV, not salt
+      pin
+    );
     cachedPrivateKey = privateKey;
     return true;
   } catch (e) {

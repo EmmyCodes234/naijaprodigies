@@ -25,6 +25,7 @@ export interface User {
   website?: string | null;
   location?: string | null;
   birth_date?: string | null;
+  onboarding_completed?: boolean;
   created_at: string;
   updated_at: string;
   following_count?: number;

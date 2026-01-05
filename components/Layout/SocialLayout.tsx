@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getTrends } from '../../services/postService';
 import { getWhoToFollow, followUser } from '../../services/userService';
 import { getUnreadMessageCount, subscribeToConversations } from '../../services/messageService';
@@ -11,11 +11,13 @@ import GistDiscovery from '../Gist/GistDiscovery';
 import VerifiedBadge from '../Shared/VerifiedBadge';
 import { useCurrentUser } from '../../hooks/useCurrentUser';
 import { useNotification } from '../../contexts/NotificationContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { getAvatarUrl } from '../../utils/userUtils';
 import Avatar from '../Shared/Avatar';
 import MoreMenu from './MoreMenu';
 import CreateGistModal from '../Gist/CreateGistModal';
 import FollowButton from '../FollowButton';
+import TodaysNews from '../Widgets/TodaysNews';
 
 interface SocialLayoutProps {
     children: React.ReactNode;
@@ -33,8 +35,11 @@ const SocialLayout: React.FC<SocialLayoutProps> = ({ children, showWidgets = tru
     const [isPostModalOpen, setIsPostModalOpen] = useState(false);
     const [isCreateGistOpen, setIsCreateGistOpen] = useState(false);
     const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+    const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
     const moreMenuRef = React.useRef<HTMLDivElement>(null);
     const moreButtonRef = React.useRef<HTMLButtonElement>(null);
+    const accountMenuRef = useRef<HTMLDivElement>(null);
+    const accountButtonRef = useRef<HTMLButtonElement>(null);
     const [trends, setTrends] = useState<{ tag: string; count: number }[]>([]);
     const [suggestedUsers, setSuggestedUsers] = useState<any[]>([]);
 
@@ -80,6 +85,15 @@ const SocialLayout: React.FC<SocialLayoutProps> = ({ children, showWidgets = tru
                 !moreButtonRef.current.contains(event.target as Node)
             ) {
                 setIsMoreMenuOpen(false);
+            }
+            // Account menu click outside
+            if (
+                accountMenuRef.current &&
+                !accountMenuRef.current.contains(event.target as Node) &&
+                accountButtonRef.current &&
+                !accountButtonRef.current.contains(event.target as Node)
+            ) {
+                setIsAccountMenuOpen(false);
             }
         };
 
@@ -190,6 +204,11 @@ const SocialLayout: React.FC<SocialLayoutProps> = ({ children, showWidgets = tru
         }
     };
 
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        navigate('/');
+    };
+
     const NavItems = [
         { icon: 'ph:house', activeIcon: 'ph:house-fill', label: 'Home', path: '/feed' },
         { icon: 'ph:magnifying-glass', activeIcon: 'ph:magnifying-glass-bold', label: 'Explore', path: '/explore' },
@@ -273,16 +292,64 @@ const SocialLayout: React.FC<SocialLayoutProps> = ({ children, showWidgets = tru
                     </nav>
 
                     {currentUser && (
-                        <div className="mt-auto mb-6 w-full flex items-center gap-3 p-3 rounded-full hover:bg-gray-200/50 cursor-pointer transition-colors xl:w-full justify-center xl:justify-start">
-                            <Avatar user={currentUser} alt="Me" className="w-10 h-10 rounded-full object-cover" />
-                            <div className="hidden xl:block flex-1 overflow-hidden">
-                                <div className="flex items-center gap-1">
-                                    <p className="font-bold text-[15px] truncate text-gray-900">{currentUser?.name || 'User'}</p>
-                                    <VerifiedBadge user={currentUser} size={16} />
+                        <div className="mt-auto mb-6 w-full relative">
+                            {/* Account Popup Menu */}
+                            {isAccountMenuOpen && (
+                                <div
+                                    ref={accountMenuRef}
+                                    className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50"
+                                    style={{ boxShadow: '0 0 15px rgba(0,0,0,0.1), 0 5px 15px rgba(0,0,0,0.1)' }}
+                                >
+                                    <button
+                                        onClick={() => {
+                                            setIsAccountMenuOpen(false);
+                                            navigate('/login');
+                                        }}
+                                        className="w-full px-4 py-3 text-left text-[15px] font-bold text-gray-900 hover:bg-gray-50 transition-colors"
+                                    >
+                                        Add an existing account
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setIsAccountMenuOpen(false);
+                                            handleLogout();
+                                        }}
+                                        className="w-full px-4 py-3 text-left text-[15px] font-bold text-gray-900 hover:bg-gray-50 transition-colors"
+                                    >
+                                        Log out @{currentUser.handle}
+                                    </button>
+                                    <div className="border-t border-gray-100">
+                                        <div className="flex items-center gap-3 px-4 py-3">
+                                            <Avatar user={currentUser} alt="Me" className="w-10 h-10 rounded-full object-cover" />
+                                            <div className="flex-1 overflow-hidden">
+                                                <div className="flex items-center gap-1">
+                                                    <p className="font-bold text-[15px] truncate text-gray-900">{currentUser?.name || 'User'}</p>
+                                                    <VerifiedBadge user={currentUser} size={16} />
+                                                </div>
+                                                <p className="text-gray-500 text-[14px] truncate">@{currentUser.handle}</p>
+                                            </div>
+                                            <Icon icon="ph:check-bold" className="text-nsp-teal" width="20" height="20" />
+                                        </div>
+                                    </div>
                                 </div>
-                                <p className="text-gray-500 text-[15px] truncate">@{currentUser.handle}</p>
-                            </div>
-                            <Icon icon="ph:dots-three-bold" className="hidden xl:block ml-auto text-gray-900" width="20" height="20" />
+                            )}
+
+                            {/* Profile Button */}
+                            <button
+                                ref={accountButtonRef}
+                                onClick={() => setIsAccountMenuOpen(!isAccountMenuOpen)}
+                                className="flex items-center gap-3 p-3 rounded-full hover:bg-gray-200/50 cursor-pointer transition-colors w-full xl:w-full justify-center xl:justify-start"
+                            >
+                                <Avatar user={currentUser} alt="Me" className="w-10 h-10 rounded-full object-cover" />
+                                <div className="hidden xl:block flex-1 overflow-hidden">
+                                    <div className="flex items-center gap-1">
+                                        <p className="font-bold text-[15px] truncate text-gray-900">{currentUser?.name || 'User'}</p>
+                                        <VerifiedBadge user={currentUser} size={16} />
+                                    </div>
+                                    <p className="text-gray-500 text-[15px] truncate">@{currentUser.handle}</p>
+                                </div>
+                                <Icon icon="ph:dots-three-bold" className="hidden xl:block ml-auto text-gray-900" width="20" height="20" />
+                            </button>
                         </div>
                     )}
                 </div>
@@ -303,6 +370,9 @@ const SocialLayout: React.FC<SocialLayoutProps> = ({ children, showWidgets = tru
                     </div>
 
                     <GistDiscovery />
+
+                    {/* Today's News */}
+                    <TodaysNews className="mb-4" />
 
                     {/* Trends */}
                     <div className="bg-gray-50 rounded-2xl overflow-hidden mb-4 border border-gray-100">

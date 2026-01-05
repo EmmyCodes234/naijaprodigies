@@ -91,7 +91,7 @@ const Notifications: React.FC = () => {
 
     const [notifications, setNotifications] = useState<NotificationModel[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [filter, setFilter] = useState<'all' | 'mentions'>('all');
+    const [filter, setFilter] = useState<'all' | 'verified' | 'mentions'>('all');
 
     useEffect(() => {
         if (currentUser) {
@@ -143,9 +143,11 @@ const Notifications: React.FC = () => {
         }
     };
 
-    const filteredNotifications = filter === 'all'
-        ? notifications
-        : notifications.filter(n => n.type === 'mention');
+    const filteredNotifications = notifications.filter(n => {
+        if (filter === 'mentions') return n.type === 'mention';
+        if (filter === 'verified') return n.actor_verified;
+        return true;
+    });
 
     return (
         <SocialLayout>
@@ -173,7 +175,7 @@ const Notifications: React.FC = () => {
                     </div>
                 )}
 
-                <div className="flex w-full">
+                <div className="flex w-full border-b border-gray-100">
                     <button
                         onClick={() => setFilter('all')}
                         className="flex-1 hover:bg-gray-100 transition-colors py-4 relative"
@@ -184,6 +186,19 @@ const Notifications: React.FC = () => {
                             </span>
                             {filter === 'all' && (
                                 <div className="absolute bottom-0 h-1 w-8 bg-nsp-teal rounded-full"></div>
+                            )}
+                        </div>
+                    </button>
+                    <button
+                        onClick={() => setFilter('verified')}
+                        className="flex-1 hover:bg-gray-100 transition-colors py-4 relative"
+                    >
+                        <div className="flex justify-center">
+                            <span className={`font-bold ${filter === 'verified' ? 'text-gray-900' : 'text-gray-500'}`}>
+                                Verified
+                            </span>
+                            {filter === 'verified' && (
+                                <div className="absolute bottom-0 h-1 w-14 bg-nsp-teal rounded-full"></div>
                             )}
                         </div>
                     </button>

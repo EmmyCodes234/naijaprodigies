@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Icon } from '@iconify/react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { NavLink } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -13,7 +13,13 @@ const Navbar: React.FC<NavbarProps> = ({ onWizardClick, onAuthClick }) => {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, signOut } = useAuth();
+
+  const handleProdigyClick = () => {
+    navigate('/prodigy');
+    setMobileMenuOpen(false);
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -67,7 +73,7 @@ const Navbar: React.FC<NavbarProps> = ({ onWizardClick, onAuthClick }) => {
         {/* Desktop CTA Button */}
         <div className="hidden md:flex items-center gap-4">
           <button
-            onClick={onWizardClick}
+            onClick={handleProdigyClick}
             className="relative group font-bold text-white transition-transform transform hover:-translate-y-1 active:translate-y-0"
           >
             <img
@@ -76,7 +82,7 @@ const Navbar: React.FC<NavbarProps> = ({ onWizardClick, onAuthClick }) => {
               alt=""
             />
             <span className="relative z-10 flex items-center gap-2 px-8 py-3 filter drop-shadow-sm">
-              <span>Word Wizard</span>
+              <span>Prodigy AI</span>
               <Icon icon="ph:sparkle-fill" width="16" height="16" />
             </span>
           </button>
@@ -136,10 +142,7 @@ const Navbar: React.FC<NavbarProps> = ({ onWizardClick, onAuthClick }) => {
             className={`w-full max-w-xs mt-4 transform transition-all duration-500 delay-200 ${mobileMenuOpen ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}
           >
             <button
-              onClick={() => {
-                onWizardClick();
-                setMobileMenuOpen(false);
-              }}
+              onClick={handleProdigyClick}
               className="relative w-full group font-bold text-white text-lg transition-transform active:scale-95"
             >
               <img
@@ -148,7 +151,7 @@ const Navbar: React.FC<NavbarProps> = ({ onWizardClick, onAuthClick }) => {
                 alt=""
               />
               <span className="relative z-10 flex justify-center items-center gap-2 py-4">
-                Ask the Wizard
+                Ask Prodigy
                 <Icon icon="ph:sparkle-fill" width="20" height="20" />
               </span>
             </button>

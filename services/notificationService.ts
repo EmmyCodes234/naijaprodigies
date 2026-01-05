@@ -153,6 +153,13 @@ export const subscribeToPushNotifications = async (userId: string): Promise<bool
     }
 
     try {
+        // Get strict auth ID to satisfy RLS and Foreign Key
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            console.error('No authenticated user found for push subscription');
+            return false;
+        }
+
         const registration = await navigator.serviceWorker.ready;
 
         // Subscribe
@@ -170,7 +177,7 @@ export const subscribeToPushNotifications = async (userId: string): Promise<bool
         const { error } = await supabase
             .from('push_subscriptions')
             .upsert({
-                user_id: userId,
+                user_id: user.id, // Use Auth ID, not Profile ID
                 endpoint: subscription.endpoint,
                 p256dh: btoa(String.fromCharCode.apply(null, new Uint8Array(p256dh) as any)),
                 auth: btoa(String.fromCharCode.apply(null, new Uint8Array(auth) as any)),

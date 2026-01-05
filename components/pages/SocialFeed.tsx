@@ -12,6 +12,7 @@ import { useToast } from '../../contexts/ToastContext';
 import Avatar from '../Shared/Avatar';
 import GistDiscovery from '../Gist/GistDiscovery';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import OnboardingFlow from '../Onboarding/OnboardingFlow';
 
 const POSTS_PER_PAGE = 20;
 
@@ -197,11 +198,25 @@ const SocialFeedContent: React.FC<{
   };
 
 const SocialFeed: React.FC = () => {
-  const { profile: currentUser, loading: userLoading } = useCurrentUser();
+  const { profile: currentUser, loading: userLoading, refetch: refetchUser } = useCurrentUser();
   const { addToast } = useToast();
   const [feedType, setFeedType] = useState<'for-you' | 'following'>('for-you');
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const queryClient = useQueryClient();
   const observerTarget = useRef<HTMLDivElement>(null);
+
+  // Check if user needs onboarding
+  useEffect(() => {
+    if (currentUser && currentUser.onboarding_completed === false) {
+      setShowOnboarding(true);
+    }
+  }, [currentUser]);
+
+  // Handle onboarding completion
+  const handleOnboardingComplete = () => {
+    setShowOnboarding(false);
+    refetchUser(); // Refresh user data
+  };
 
   // React Query: Infinite Posts Fetch
   const {
@@ -491,6 +506,16 @@ const SocialFeed: React.FC = () => {
 
 
   if (!userLoading && !currentUser) return null;
+
+  // Show onboarding for new users
+  if (showOnboarding && currentUser) {
+    return (
+      <OnboardingFlow
+        currentUser={currentUser}
+        onComplete={handleOnboardingComplete}
+      />
+    );
+  }
 
   return (
     <SocialLayout>

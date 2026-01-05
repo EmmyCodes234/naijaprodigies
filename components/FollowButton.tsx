@@ -48,11 +48,9 @@ const FollowButton: React.FC<FollowButtonProps> = ({
       return;
     }
 
-    // Get the most up-to-date session ID to ensure RLS compliance
+    // Verify session is active (but uses currentUserId for DB operations)
     const { data: { user } } = await supabase.auth.getUser();
-    const activeUserId = user?.id;
-
-    if (!activeUserId) {
+    if (!user) {
       alert('Session expired. Please log in again.');
       return;
     }
@@ -65,9 +63,9 @@ const FollowButton: React.FC<FollowButtonProps> = ({
 
     try {
       if (previousState) {
-        await unfollowUser(activeUserId, targetUserId);
+        await unfollowUser(currentUserId, targetUserId);
       } else {
-        await followUser(activeUserId, targetUserId);
+        await followUser(currentUserId, targetUserId);
       }
 
       // Notify parent component of the change
@@ -75,33 +73,37 @@ const FollowButton: React.FC<FollowButtonProps> = ({
     } catch (error: any) {
       console.error('Failed to toggle follow:', error);
 
-      // AUTO-HEAL: If user profile is missing (Foreign Key Violation), create it and retry
-      if (error?.code === '23503' && error?.message?.includes('users')) {
+      // AUTO-HEAL: If user profile is missing (Foreign Key Violation) or has permission issues (RLS Violation)
+      const isFkError = error?.code === '23503';
+      const isRlsError = error?.code === '42501';
+
+      if (isFkError || isRlsError) {
         try {
-          console.log('User profile missing. Attempting to auto-create...');
-          const { data: userData } = await supabase.auth.getUser();
-          if (userData?.user) {
-            const { error: createError } = await supabase.from('users').insert({
-              id: activeUserId,
-              // email: userData.user.email, // removed: not in schema
-              name: userData.user.user_metadata?.name || userData.user.email?.split('@')[0] || 'User',
-              handle: userData.user.user_metadata?.handle || `user_${activeUserId.substring(0, 8)}`,
-              verified: false
+          console.log('User profile missing or mismatch. Attempting to auto-create...');
+
+          if (user) {
+            console.log('User authenticated. Attempting emergency RPC fix...');
+
+            const { error: rpcError } = await supabase.rpc('ensure_user_profile', {
+              p_id: currentUserId, // Use the Profile ID we have (which should match user.id or be valid)
+              p_name: user.user_metadata?.name || 'User',
+              p_handle: user.user_metadata?.handle || `user_${user.id.substring(0, 8)}`,
+              p_avatar: user.user_metadata?.avatar_url || null
             });
 
-            if (!createError) {
-              console.log('Profile created! Retrying follow...');
+            if (!rpcError) {
+              console.log('Profile repaired via RPC! Retrying follow...');
               // Retry the follow action
               if (previousState) {
-                await unfollowUser(activeUserId, targetUserId);
+                await unfollowUser(currentUserId, targetUserId);
               } else {
-                await followUser(activeUserId, targetUserId);
+                await followUser(currentUserId, targetUserId);
               }
               // If we get here, it succeeded on retry!
               onFollowChange?.(!previousState);
               return; // Success, skip the revert code below
             } else {
-              console.error('Failed to auto-create profile:', createError);
+              console.error('RPC Fix failed:', rpcError);
             }
           }
         } catch (retryError) {

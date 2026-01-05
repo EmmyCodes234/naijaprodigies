@@ -44,6 +44,10 @@ export const analyzePost = async (postContent: string, prompt: string): Promise<
     }
 };
 
+export const chatWithProdigy = async (message: string): Promise<AIResponse> => {
+    return analyzePost("User is chatting directly with you.", message);
+};
+
 export const postAIComment = async (postId: string, content: string, parentCommentId?: string): Promise<string | null> => {
     try {
         const { supabase } = await import('./supabaseClient');

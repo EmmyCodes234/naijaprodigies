@@ -84,7 +84,7 @@ const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({ postContent, initialPro
                             <div className="flex flex-wrap gap-2 justify-center">
                                 <button onClick={() => { setPrompt("Summarize this"); handleAnalysis("Summarize this"); }} className="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-full text-xs font-medium text-gray-700 transition-colors">Summarize</button>
                                 <button onClick={() => { setPrompt("Explain like I'm 5"); handleAnalysis("Explain like I'm 5"); }} className="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-full text-xs font-medium text-gray-700 transition-colors">Explain</button>
-                                <button onClick={() => { setPrompt("Roast this post"); handleAnalysis("Roast this post"); }} className="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-full text-xs font-medium text-gray-700 transition-colors">Roast 🔥</button>
+                                <button onClick={() => { setPrompt("Roast this post savagely"); handleAnalysis("Roast this post savagely"); }} className="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-full text-xs font-medium text-gray-700 transition-colors">Roast 🔥</button>
                                 <button onClick={() => { setPrompt("Is this true?"); handleAnalysis("Is this true?"); }} className="px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-full text-xs font-medium text-gray-700 transition-colors">Fact Check</button>
                             </div>
                         )}

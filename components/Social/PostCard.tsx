@@ -242,7 +242,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onReply,
     if (aiComment) return;
     setAnalyzing(true);
     try {
-      const commentary = await analyzePost(post.content, "Judge this post and give a witty verdict (under 30 words).");
+      const commentary = await analyzePost(post.content, "Judge this post. Be savage, roast the user based on the context, and keep it under 30 words.");
       setAiComment(commentary.content); // Extract content from AIResponse
     } catch (e) {
       console.error(e);

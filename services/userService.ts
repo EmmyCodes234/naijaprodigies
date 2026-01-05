@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient'
-import type { User, Post } from '../types'
+import type { User, Post, Comment } from '../types'
 
 /**
  * User Service
@@ -12,6 +12,7 @@ export interface UserService {
   getUserByHandle(handle: string): Promise<User>
   updateUserProfile(userId: string, updates: Partial<User>): Promise<User>
   getUserPosts(userId: string, filter: 'posts' | 'media' | 'liked'): Promise<Post[]>
+  getUserReplies(userId: string): Promise<Comment[]>
   getFollowers(userId: string): Promise<User[]>
   getFollowing(userId: string): Promise<User[]>
 }
@@ -68,8 +69,16 @@ export const getUserById = async (userId: string): Promise<User> => {
  * Get user by handle
  */
 export const getUserByHandle = async (handle: string): Promise<User> => {
-  // Implementation will be added in future tasks
-  throw new Error('Not implemented')
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .ilike('handle', handle) // Case insensitive
+    .single();
+
+  if (error) throw error;
+  if (!data) throw new Error('User not found');
+
+  return data;
 }
 
 /**
@@ -476,5 +485,53 @@ export const updatePassword = async (newPassword: string): Promise<void> => {
 export const getConnectedAccounts = async (): Promise<any[]> => {
   const { data: { user } } = await supabase.auth.getUser();
   return user?.identities || [];
+}
+
+/**
+ * Get user's replies (comments)
+ */
+export const getUserReplies = async (userId: string): Promise<Comment[]> => {
+  const { data: comments, error } = await supabase
+    .from('comments')
+    .select(`
+      id,
+      post_id,
+      user_id,
+      content,
+      parent_comment_id,
+      created_at,
+      media_url,
+      media_type,
+      user:users!comments_user_id_fkey(
+        id,
+        handle,
+        name,
+        avatar,
+        bio,
+        rank,
+        verified,
+        verification_type,
+        created_at,
+        updated_at
+      )
+    `)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+
+  // Transform to Comment type
+  return (comments || []).map((comment: any) => ({
+    id: comment.id,
+    post_id: comment.post_id,
+    user_id: comment.user_id,
+    user: Array.isArray(comment.user) ? comment.user[0] : comment.user,
+    content: comment.content,
+    parent_comment_id: comment.parent_comment_id,
+    created_at: comment.created_at,
+    replies: [],
+    media_url: comment.media_url,
+    media_type: comment.media_type
+  }));
 }
 

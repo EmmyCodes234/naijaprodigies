@@ -8,6 +8,7 @@ import MessageThread from '../Messaging/MessageThread';
 import NewMessageModal from '../Messaging/NewMessageModal';
 import EncryptionSetupModal from '../Messaging/EncryptionSetupModal';
 import EncryptionUnlockModal from '../Messaging/EncryptionUnlockModal';
+import MessageSettings from '../Messaging/MessageSettings';
 import { Conversation } from '../../types';
 import { getConversations, subscribeToConversations, getOrCreateConversation, hasKeysSetup } from '../../services/messageService';
 import { getUserById } from '../../services/userService';
@@ -36,6 +37,9 @@ const Messages: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isMobileListVisible, setIsMobileListVisible] = useState(true);
   const [isNewMessageModalOpen, setIsNewMessageModalOpen] = useState(false);
+
+  // Settings panel state
+  const [showSettings, setShowSettings] = useState(false);
 
   // E2EE State
   const [showSetupModal, setShowSetupModal] = useState(false);
@@ -202,6 +206,22 @@ const Messages: React.FC = () => {
 
   const selectedConversation = conversations.find(c => c.id === activeConversationId);
 
+  // Handle conversation selection - clear unread count locally
+  const handleSelectConversation = (conversationId: string | null) => {
+    setActiveConversationId(conversationId);
+
+    // Clear unread count locally for immediate UI feedback
+    if (conversationId) {
+      setConversations(prev =>
+        prev.map(conv =>
+          conv.id === conversationId
+            ? { ...conv, unread_count: 0 }
+            : conv
+        )
+      );
+    }
+  };
+
   return (
     <SocialLayout showWidgets={false} fullWidth={true} hideBottomNav={!!activeConversationId}>
       <div className="h-[calc(100vh)] md:h-[100vh] flex flex-col md:flex-row overflow-hidden bg-white">
@@ -216,7 +236,7 @@ const Messages: React.FC = () => {
               <h2 className="font-bold text-xl text-gray-900">Messages</h2>
               <div className="flex items-center gap-1">
                 <button
-                  onClick={() => navigate('/settings')}
+                  onClick={() => setShowSettings(true)}
                   className="p-2 hover:bg-black/5 rounded-full transition-colors"
                   title="Settings"
                 >
@@ -237,16 +257,25 @@ const Messages: React.FC = () => {
           <ConversationList
             conversations={conversations}
             selectedConversationId={activeConversationId}
-            onSelectConversation={setActiveConversationId}
+            onSelectConversation={handleSelectConversation}
             currentUserId={currentUser.id}
           />
         </div>
 
-        {/* Message Thread - Right Panel */}
-        {/* On mobile: visible if active conversation */}
+        {/* Message Thread / Settings - Right Panel */}
+        {/* On mobile: visible if active conversation or settings */}
         {/* On desktop: always visible (flex-1) */}
-        <div className={`${activeConversationId ? 'flex' : 'hidden md:flex'} flex-1 flex-col h-full bg-white relative`}>
-          {selectedConversation ? (
+        <div className={`${activeConversationId || showSettings ? 'flex' : 'hidden md:flex'} flex-1 flex-col h-full bg-white relative`}>
+          {showSettings ? (
+            <MessageSettings
+              currentUser={currentUser}
+              onClose={() => setShowSettings(false)}
+              onChangePasscode={() => {
+                setShowSettings(false);
+                setShowSetupModal(true);
+              }}
+            />
+          ) : selectedConversation ? (
             <MessageThread
               conversation={selectedConversation}
               currentUser={currentUser}
@@ -277,6 +306,23 @@ const Messages: React.FC = () => {
         onClose={() => setIsNewMessageModalOpen(false)}
         currentUser={currentUser}
       />
+
+      {currentUser && (
+        <>
+          <EncryptionSetupModal
+            isOpen={showSetupModal}
+            onClose={() => setShowSetupModal(false)}
+            userId={currentUser.id}
+            onSuccess={handleSecuritySuccess}
+          />
+          <EncryptionUnlockModal
+            isOpen={showUnlockModal}
+            onClose={() => setShowUnlockModal(false)}
+            userId={currentUser.id}
+            onSuccess={handleSecuritySuccess}
+          />
+        </>
+      )}
     </SocialLayout>
   );
 };

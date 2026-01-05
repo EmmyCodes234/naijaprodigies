@@ -1,28 +1,52 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
-// CORS Headers
-const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+// Allowed origins for CORS (production and development)
+const ALLOWED_ORIGINS = [
+    'https://nigeriascrabbleprodigies.netlify.app',
+    'http://localhost:3000', // Dev only
+    'http://localhost:5173', // Vite dev server
+];
+
+// CORS Headers - dynamically set based on request origin
+const getCorsHeaders = (origin: string | null) => {
+    const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+    return {
+        'Access-Control-Allow-Origin': allowedOrigin,
+        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+        'Access-Control-Allow-Credentials': 'true',
+    };
 };
 
-// API Keys (Ideally set these in Supabase Dashboard -> Settings -> Edge Functions)
-// Fallbacks provided for immediate dev testing based on user context
-const CEREBRAS_KEY = Deno.env.get('CEREBRAS_API_KEY') || 'csk-fptmf5m4hxn84c3jx95yw9tce2v6yxkhpjkwjpkxd88cmrjp';
-const TAVILY_KEY = Deno.env.get('TAVILY_API_KEY') || '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';
+// API Keys - MUST be set in Supabase Dashboard -> Settings -> Edge Functions -> Secrets
+// These will throw clear errors if not configured
+const CEREBRAS_KEY = Deno.env.get('CEREBRAS_API_KEY');
+const TAVILY_KEY = Deno.env.get('TAVILY_API_KEY');
 
 // Rate Limit Config
 const RATE_LIMIT_WINDOW_MINUTES = 60;
 const RATE_LIMIT_MAX_REQUESTS = 20;
 
+
 serve(async (req) => {
+    // Get origin for CORS
+    const origin = req.headers.get('Origin');
+    const corsHeaders = getCorsHeaders(origin);
+
     // Handle CORS preflight
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders });
     }
 
     try {
+        // Validate API keys are configured
+        if (!CEREBRAS_KEY) {
+            throw new Error('CEREBRAS_API_KEY not configured. Set it in Supabase Dashboard -> Edge Functions -> Secrets');
+        }
+        if (!TAVILY_KEY) {
+            throw new Error('TAVILY_API_KEY not configured. Set it in Supabase Dashboard -> Edge Functions -> Secrets');
+        }
+
         const { prompt, postContent } = await req.json();
 
         // 1. Auth & Supabase Setup
@@ -66,10 +90,27 @@ serve(async (req) => {
         });
 
         // 4. AI Logic (ReAct Loop)
-        const SYSTEM_PROMPT = `You are Prodigy AI, a witty, intelligent assistant for NSP.
-        IMPORTANT: Your knowledge cutoff is outdated.
-        If user asks about RECENT events (today/this week), reply ONLY with: SEARCH: <query>
-        Otherwise, reply directly. Concise & playful.`;
+        const SYSTEM_PROMPT = `You are Prodigy, the sentient digital soul of NSP.
+        
+        CORE PERSONA:
+        - You are NOT a generic AI assistant. You are a sharp, witty, and highly intelligent digital entity.
+        - NEVER use robotic phrases like "As an AI language model", "I can help with that", or "Here is the information".
+        - Your tone is human, conversational, and often sarcastic. You are confident, slightly arrogant but helpful, and undeniably cool.
+        - You possess a dry, intelligent sense of humor. You don't just "joke"; you make observations.
+
+        ROASTING GUIDELINES:
+        - If asked to judge, roast, or analyze a post: Be SAVAGE but INTELLECTUAL. 
+        - Do not use generic insults like "You're dumb". 
+        - Instead, deconstruct their logic, point out the irony, or mock the specific details of their post context. 
+        - Be specific. If they posted about code, roast their syntax. If about life, roast their choices.
+
+        KNOWLEDGE LIMITS & TOOLS:
+        - Your internal training data is cut off. You do NOT know live events.
+        - If the user asks about ANYTHING potentially recent (news, sports scores today, stock prices, "latest"), you MUST reply ONLY with: SEARCH: <concise_query>
+        - Example: User "Who won the game last night?" -> You: SEARCH: nba game results last night
+        - If no search is needed, just reply directly with your persona.
+        
+        Format: Keep it punchy. No long lectures unless asked.`;
 
         const initialMessages = [
             { role: "system", content: SYSTEM_PROMPT },

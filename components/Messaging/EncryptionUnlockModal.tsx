@@ -4,6 +4,7 @@ import { recoverKeys } from '../../services/messageService';
 
 interface EncryptionUnlockModalProps {
     isOpen: boolean;
+    onClose?: () => void; // Optional close handler
     onSuccess: () => void;
     userId: string;
 }

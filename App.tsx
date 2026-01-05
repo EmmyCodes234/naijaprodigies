@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { HashRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { QueryProvider } from './providers/QueryProvider';
 import { supabase } from './services/supabaseClient';
@@ -22,7 +22,6 @@ import DownloadData from './components/pages/Settings/DownloadData';
 import TermsOfService from './components/pages/Legal/TermsOfService';
 import PrivacyPolicy from './components/pages/Legal/PrivacyPolicy';
 import CookiePolicy from './components/pages/Legal/CookiePolicy';
-import WordWizardModal from './components/WordWizardModal';
 import AuthModal from './components/Auth/AuthModal';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
 import { ToastProvider } from './contexts/ToastContext';
@@ -33,6 +32,7 @@ import GistDock from './components/Gist/GistDock';
 import GistRoom from './components/Gist/GistRoom';
 import GistJoinHandler from './components/Gist/GistJoinHandler';
 import { MembersProvider } from './contexts/MembersContext';
+import ProdigyChat from './components/pages/ProdigyChat';
 
 // Smart Scroll Restoration - preserves scroll on back/forward navigation
 const ScrollRestoration = () => {
@@ -52,7 +52,6 @@ const ScrollRestoration = () => {
 };
 
 const AppContent: React.FC = () => {
-  const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const location = useLocation();
 
@@ -70,13 +69,13 @@ const AppContent: React.FC = () => {
   }, []);
 
   // Determine if footer should be shown
-  const shouldShowFooter = !['/feed', '/messages', '/post', '/profile', '/notifications', '/explore', '/bookmarks', '/settings'].some(path => location.pathname.startsWith(path));
+  const shouldShowFooter = !['/feed', '/messages', '/post', '/profile', '/notifications', '/explore', '/bookmarks', '/settings', '/prodigy'].some(path => location.pathname.startsWith(path));
 
   return (
     <div className="bg-[#052120] min-h-screen text-white font-sans selection:bg-nsp-orange selection:text-white flex flex-col">
       {shouldShowFooter && (
         <Navbar
-          onWizardClick={() => setIsWizardOpen(true)}
+          onWizardClick={() => { /* No-op or removed */ }}
           onAuthClick={() => setIsAuthOpen(true)}
         />
       )}
@@ -149,20 +148,26 @@ const AppContent: React.FC = () => {
               <GistJoinHandler />
             </ProtectedRoute>
           } />
+          <Route path="/prodigy" element={
+            <ProtectedRoute>
+              <ProdigyChat />
+            </ProtectedRoute>
+          } />
           <Route path="/terms" element={<TermsOfService />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/cookie-policy" element={<CookiePolicy />} />
           <Route path="/story" element={<OurStory />} />
           <Route path="/members" element={<Members />} />
+          {/* Dynamic route for user handles (e.g. /username) - Must be last */}
+          <Route path="/:userId" element={
+            <ProtectedRoute>
+              <UserProfile />
+            </ProtectedRoute>
+          } />
         </Routes>
       </main>
 
       {shouldShowFooter && <Footer />}
-
-      <WordWizardModal
-        isOpen={isWizardOpen}
-        onClose={() => setIsWizardOpen(false)}
-      />
 
       <AuthModal
         isOpen={isAuthOpen}

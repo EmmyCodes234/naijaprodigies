@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Icon } from '@iconify/react';
-import { User, Post } from '../../types';
-import { getUserById, getUserPosts } from '../../services/userService';
+import { User, Post, Comment } from '../../types';
+import { getUserById, getUserPosts, getUserReplies, getUserByHandle } from '../../services/userService';
 import { useCurrentUser } from '../../hooks/useCurrentUser';
 import PostCard from '../Social/PostCard';
+import CommentThread from '../Social/CommentThread';
 import { likePost, unlikePost, createComment, createReRack, deletePost } from '../../services/postService';
 import { useToast } from '../../contexts/ToastContext';
 import { getFollowerCount, getFollowingCount } from '../../services/followService';
@@ -17,7 +18,7 @@ import { getAvatarUrl } from '../../utils/userUtils';
 import Avatar from '../Shared/Avatar';
 import VerifiedBadge from '../Shared/VerifiedBadge';
 
-type TabType = 'posts' | 'media' | 'liked';
+type TabType = 'posts' | 'replies' | 'media' | 'liked';
 
 const UserProfile: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
@@ -27,9 +28,10 @@ const UserProfile: React.FC = () => {
 
   const [user, setUser] = useState<User | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
+  const [replies, setReplies] = useState<Comment[]>([]);
   const [activeTab, setActiveTab] = useState<TabType>('posts');
   const [loading, setLoading] = useState(true);
-  const [loadingPosts, setLoadingPosts] = useState(false);
+  const [loadingContent, setLoadingContent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [followerCount, setFollowerCount] = useState<number>(0);
   const [followingCount, setFollowingCount] = useState<number>(0);
@@ -37,25 +39,38 @@ const UserProfile: React.FC = () => {
   const [followModalType, setFollowModalType] = useState<'followers' | 'following'>('followers');
   const [showEditModal, setShowEditModal] = useState(false);
 
+  const isUuid = (str: string) => {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+  };
+
   // Load user profile
   useEffect(() => {
     const loadUser = async () => {
       if (!userId) {
-        setError('User ID is required');
+        setError('User ID or Handle is required');
         setLoading(false);
         return;
       }
 
       try {
         setLoading(true);
-        const userData = await getUserById(userId);
+        let userData: User;
+
+        if (isUuid(userId)) {
+          userData = await getUserById(userId);
+        } else {
+          // Assume it's a handle (remove @ if present)
+          const handle = userId.startsWith('@') ? userId.substring(1) : userId;
+          userData = await getUserByHandle(handle);
+        }
+
         setUser(userData);
         setError(null);
 
-        // Load follower/following counts
+        // Load follower/following counts using the resolute ID
         const [followers, following] = await Promise.all([
-          getFollowerCount(userId),
-          getFollowingCount(userId)
+          getFollowerCount(userData.id),
+          getFollowingCount(userData.id)
         ]);
         setFollowerCount(followers);
         setFollowingCount(following);
@@ -70,26 +85,37 @@ const UserProfile: React.FC = () => {
     loadUser();
   }, [userId]);
 
-  // Load posts when user or tab changes
+  // Load posts/replies when user or tab changes
   useEffect(() => {
-    const loadPosts = async () => {
-      if (!userId) return;
+    const loadContent = async () => {
+      if (!user) return; // Wait for user to be loaded
 
       try {
-        setLoadingPosts(true);
-        const userPosts = await getUserPosts(userId, activeTab);
-        setPosts(userPosts);
+        setLoadingContent(true);
+        if (activeTab === 'replies') {
+          const userReplies = await getUserReplies(user.id);
+          setReplies(userReplies);
+        } else {
+          const userPosts = await getUserPosts(user.id, activeTab as 'posts' | 'media' | 'liked');
+          setPosts(userPosts);
+        }
       } catch (err) {
-        console.error('Failed to load posts:', err);
+        console.error('Failed to load content:', err);
       } finally {
-        setLoadingPosts(false);
+        setLoadingContent(false);
       }
     };
 
-    if (user) {
-      loadPosts();
-    }
-  }, [userId, activeTab, user]);
+    loadContent();
+  }, [user, activeTab]);
+
+  const handleShareProfile = () => {
+    if (!user) return;
+    const url = `${window.location.origin}/${user.handle}`;
+    navigator.clipboard.writeText(url).then(() => {
+      addToast('success', 'Profile link copied to clipboard!');
+    });
+  };
 
   const handleLike = async (postId: string) => {
     if (!currentUser) return;
@@ -298,6 +324,13 @@ const UserProfile: React.FC = () => {
 
               {/* Buttons */}
               <div className="mt-4 flex gap-2">
+                <button
+                  onClick={handleShareProfile}
+                  className="p-2 border border-gray-300 rounded-full font-bold text-gray-900 hover:bg-gray-50 transition-colors"
+                  title="Share Profile"
+                >
+                  <Icon icon="ph:share-network" width="20" height="20" />
+                </button>
                 {currentUser?.id === user.id ? (
                   <button
                     onClick={() => setShowEditModal(true)}
@@ -400,7 +433,7 @@ const UserProfile: React.FC = () => {
               onClick={() => setActiveTab('posts')}
               className={`flex-1 py-4 text-center font-bold transition-colors relative ${activeTab === 'posts'
                 ? 'text-gray-900'
-                : 'text-gray-500 hover:bg-gray-50'
+                : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
                 }`}
             >
               Posts
@@ -409,10 +442,22 @@ const UserProfile: React.FC = () => {
               )}
             </button>
             <button
+              onClick={() => setActiveTab('replies')}
+              className={`flex-1 py-4 text-center font-bold transition-colors relative ${activeTab === 'replies'
+                ? 'text-gray-900'
+                : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
+                }`}
+            >
+              Replies
+              {activeTab === 'replies' && (
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-nsp-teal rounded-full"></div>
+              )}
+            </button>
+            <button
               onClick={() => setActiveTab('media')}
               className={`flex-1 py-4 text-center font-bold transition-colors relative ${activeTab === 'media'
                 ? 'text-gray-900'
-                : 'text-gray-500 hover:bg-gray-50'
+                : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
                 }`}
             >
               Media
@@ -424,7 +469,7 @@ const UserProfile: React.FC = () => {
               onClick={() => setActiveTab('liked')}
               className={`flex-1 py-4 text-center font-bold transition-colors relative ${activeTab === 'liked'
                 ? 'text-gray-900'
-                : 'text-gray-500 hover:bg-gray-50'
+                : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
                 }`}
             >
               Liked
@@ -437,37 +482,62 @@ const UserProfile: React.FC = () => {
 
         {/* Posts Feed */}
         <div>
-          {loadingPosts ? (
+          {loadingContent ? (
             <div className="flex justify-center items-center py-12">
               <Icon icon="line-md:loading-twotone-loop" width="32" height="32" className="text-nsp-teal" />
             </div>
-          ) : posts.length === 0 ? (
-            <div className="text-center py-12 px-4">
-              <Icon icon="ph:note-blank" width="64" height="64" className="text-gray-300 mx-auto mb-4" />
-              <h3 className="text-xl font-bold text-gray-900 mb-2">
-                {activeTab === 'posts' && 'No posts yet'}
-                {activeTab === 'media' && 'No media posts'}
-                {activeTab === 'liked' && 'No liked posts'}
-              </h3>
-              <p className="text-gray-500">
-                {activeTab === 'posts' && currentUser?.id === user.id && 'Share your first post!'}
-                {activeTab === 'posts' && currentUser?.id !== user.id && 'This user hasn\'t posted yet.'}
-                {activeTab === 'media' && 'No posts with images or videos.'}
-                {activeTab === 'liked' && 'No liked posts to show.'}
-              </p>
-            </div>
           ) : (
-            posts.map((post) => (
-              <PostCard
-                key={post.id}
-                post={post}
-                currentUser={currentUser!}
-                onLike={handleLike}
-                onReply={handleReply}
-                onReRack={handleReRack}
-                onDelete={handleDelete}
-              />
-            ))
+            <>
+              {activeTab === 'replies' ? (
+                // Replies Feed
+                replies.length === 0 ? (
+                  <div className="text-center py-12 px-4">
+                    <Icon icon="ph:chat-dots" width="64" height="64" className="text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">No replies yet</h3>
+                    <p className="text-gray-500">When {currentUser?.id === user.id ? 'you' : 'they'} reply to posts, they will show up here.</p>
+                  </div>
+                ) : (
+                  <CommentThread
+                    comments={replies}
+                    currentUser={currentUser!}
+                    onReply={() => {
+                      // TODO: Implement reply from profile view if needed, or navigate to post
+                      addToast('info', 'View post to reply');
+                    }}
+                  />
+                )
+              ) : (
+                // Posts Feed (Posts, Media, Liked)
+                posts.length === 0 ? (
+                  <div className="text-center py-12 px-4">
+                    <Icon icon="ph:note-blank" width="64" height="64" className="text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">
+                      {activeTab === 'posts' && 'No posts yet'}
+                      {activeTab === 'media' && 'No media posts'}
+                      {activeTab === 'liked' && 'No liked posts'}
+                    </h3>
+                    <p className="text-gray-500">
+                      {activeTab === 'posts' && currentUser?.id === user.id && 'Share your first post!'}
+                      {activeTab === 'posts' && currentUser?.id !== user.id && 'This user hasn\'t posted yet.'}
+                      {activeTab === 'media' && 'No posts with images or videos.'}
+                      {activeTab === 'liked' && 'No liked posts to show.'}
+                    </p>
+                  </div>
+                ) : (
+                  posts.map((post) => (
+                    <PostCard
+                      key={post.id}
+                      post={post}
+                      currentUser={currentUser!}
+                      onLike={handleLike}
+                      onReply={handleReply}
+                      onReRack={handleReRack}
+                      onDelete={handleDelete}
+                    />
+                  ))
+                )
+              )}
+            </>
           )}
         </div>
       </div>
