@@ -331,14 +331,39 @@ const PostDetail: React.FC = () => {
 
     const handleCommentReply = async (commentId: string, content: string, mediaUrl?: string, mediaType?: 'image' | 'video' | 'gif') => {
         if (!currentUser || !post) return;
+
+        // AI Tag Detection
+        let aiTriggerQuery: string | null = null;
+        if (content.toLowerCase().includes('@prodigy')) {
+            aiTriggerQuery = content.replace(/@Prodigy/gi, '').trim() || "Analyze this";
+        }
+
         try {
             await createComment(post.id, currentUser.id, content, commentId, mediaUrl, mediaType);
             addToast('success', 'Reply sent');
+
             // Reload comments
             const fetchedComments = await getComments(post.id);
             setComments(fetchedComments);
             // Update counts
             setPost(prev => prev ? ({ ...prev, comments_count: prev.comments_count + 1 }) : null);
+
+            // Trigger AI if tagged
+            if (aiTriggerQuery) {
+                analyzePost(post.content, aiTriggerQuery).then(async (response) => {
+                    if (response.content) {
+                        // Reply to the SAME parent (Sibling reply) for visibility
+                        // Or reply to the user's new comment if we had the ID. 
+                        // For now, sibling reply ensuring it stays in the thread.
+                        await postAIComment(post.id, response.content, commentId);
+
+                        // Refresh comments again to show AI reply
+                        const newComments = await getComments(post.id);
+                        setComments(newComments);
+                    }
+                });
+            }
+
         } catch (err) {
             console.error('Failed to reply to comment:', err);
             addToast('error', 'Failed to send reply');

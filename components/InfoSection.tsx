@@ -1,13 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { Icon } from '@iconify/react';
+import { useAnimationOnce } from '../hooks/useAnimationOnce';
 
 // Custom hook for checking visibility
 const useInView = (options?: IntersectionObserverInit) => {
   const [ref, setRef] = useState<HTMLElement | null>(null);
   const [isVisible, setIsVisible] = useState(false);
+  const hasAnimated = useAnimationOnce('info-section');
 
   useEffect(() => {
     if (!ref) return;
+
+    // If already animated, show immediately
+    if (hasAnimated) {
+      setIsVisible(true);
+      return;
+    }
+
     const observer = new IntersectionObserver(([entry]) => {
       if (entry.isIntersecting) {
         setIsVisible(true);
@@ -16,7 +25,7 @@ const useInView = (options?: IntersectionObserverInit) => {
     }, options);
     observer.observe(ref);
     return () => observer.disconnect();
-  }, [ref, options]);
+  }, [ref, options, hasAnimated]);
 
   return [setRef, isVisible] as const;
 };

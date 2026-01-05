@@ -111,7 +111,7 @@ const FollowListModal: React.FC<FollowListModalProps> = ({
                     >
                       <img
                         src={user.avatar || '/default-avatar.png'}
-                        alt={user.name}
+                        alt={user.name || 'User'}
                         className="w-12 h-12 rounded-full object-cover"
                       />
                     </div>
@@ -123,7 +123,7 @@ const FollowListModal: React.FC<FollowListModalProps> = ({
                     >
                       <div className="flex items-center gap-1">
                         <span className="font-bold text-gray-900 truncate">
-                          {user.name}
+                          {user.name || 'Unknown User'}
                         </span>
                         <VerifiedBadge user={user} size={16} />
                       </div>

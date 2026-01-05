@@ -183,10 +183,10 @@ const Explore: React.FC = () => {
                                     <div className="divide-y divide-gray-100">
                                         {users.map(user => (
                                             <div key={user.id} className="flex items-center gap-3 p-4 hover:bg-gray-50 cursor-pointer transition-colors" onClick={() => navigate(`/profile/${user.id}`)}>
-                                                <img src={getAvatarUrl(user)} alt={user.name} className="w-12 h-12 rounded-full object-cover" />
+                                                <img src={getAvatarUrl(user)} alt={user.name || 'User'} className="w-12 h-12 rounded-full object-cover" />
                                                 <div className="flex-1">
                                                     <div className="flex items-center gap-1">
-                                                        <h4 className="font-bold text-gray-900 hover:underline">{user.name}</h4>
+                                                        <h4 className="font-bold text-gray-900 hover:underline">{user.name || 'Unknown User'}</h4>
                                                         <VerifiedBadge user={user} size={16} />
                                                     </div>
                                                     <p className="text-gray-500 text-sm">@{user.handle}</p>

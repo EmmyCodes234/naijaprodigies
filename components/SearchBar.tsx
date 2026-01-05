@@ -127,16 +127,16 @@ const SearchBar: React.FC<SearchBarProps> = ({ className = '' }) => {
                   {/* Avatar */}
                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-nsp-orange to-nsp-teal flex items-center justify-center text-white font-bold flex-shrink-0 overflow-hidden">
                     {user.avatar ? (
-                      <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+                      <img src={user.avatar} alt={user.name || 'User'} className="w-full h-full object-cover" />
                     ) : (
-                      user.name.charAt(0).toUpperCase()
+                      (user.name || '?').charAt(0).toUpperCase()
                     )}
                   </div>
 
                   {/* User Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1">
-                      <span className="font-bold text-gray-900 truncate">{user.name}</span>
+                      <span className="font-bold text-gray-900 truncate">{user.name || 'Unknown User'}</span>
                       <VerifiedBadge user={user} size={16} />
                     </div>
                     <div className="text-sm text-gray-500 truncate">@{user.handle}</div>
@@ -168,15 +168,15 @@ const SearchBar: React.FC<SearchBarProps> = ({ className = '' }) => {
                   {/* Post Author */}
                   <div className="flex items-center gap-2 mb-2">
                     <div className="w-6 h-6 rounded-full bg-gradient-to-br from-nsp-orange to-nsp-teal flex items-center justify-center text-white text-xs font-bold overflow-hidden">
-                      {post.user.avatar ? (
-                        <img src={post.user.avatar} alt={post.user.name} className="w-full h-full object-cover" />
+                      {post.user?.avatar ? (
+                        <img src={post.user.avatar} alt={post.user.name || 'User'} className="w-full h-full object-cover" />
                       ) : (
-                        post.user.name.charAt(0).toUpperCase()
+                        (post.user?.name || '?').charAt(0).toUpperCase()
                       )}
                     </div>
-                    <span className="font-bold text-gray-900 text-sm">{post.user.name}</span>
+                    <span className="font-bold text-gray-900 text-sm">{post.user?.name || 'Unknown User'}</span>
                     <VerifiedBadge user={post.user} size={14} />
-                    <span className="text-gray-500 text-sm">@{post.user.handle}</span>
+                    <span className="text-gray-500 text-sm">@{post.user?.handle}</span>
                   </div>
 
                   {/* Post Content */}

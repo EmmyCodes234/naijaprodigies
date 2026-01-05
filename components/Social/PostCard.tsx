@@ -2,14 +2,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon } from '@iconify/react';
 import { Post, User, Comment } from '../../types';
-import { analyzePost } from '../../services/geminiService';
+import { analyzePost } from '../../services/aiService';
 import { renderContentWithLinks } from '../../utils/textParsing.tsx';
 import { formatRelativeTime } from '../../utils/dateUtils';
 import { getComments, createComment, subscribeToComments, savePost, unsavePost, incrementImpressions } from '../../services/postService';
 import CommentThread from './CommentThread';
 import { useToast } from '../../contexts/ToastContext';
 import ConfirmationModal from '../Modals/ConfirmationModal';
+import AIAnalysisView from './AIAnalysisView';
 import { getAvatarUrl } from '../../utils/userUtils';
+import { searchUsers } from '../../services/userService';
+import MentionList from '../Shared/MentionList';
 import PollDisplay from './PollDisplay';
 import EmojiPicker, { EmojiClickData, Theme } from 'emoji-picker-react';
 import GifPicker from '../Shared/GifPicker';
@@ -35,6 +38,8 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onReply,
 
   const { addToast } = useToast();
   const [analyzing, setAnalyzing] = useState(false);
+  const [showAI, setShowAI] = useState(false);
+  const [aiQuery, setAiQuery] = useState('');
   const [aiComment, setAiComment] = useState<string | null>(post.aiCommentary || null);
   const [isReplying, setIsReplying] = useState(false);
   const [replyText, setReplyText] = useState('');
@@ -54,6 +59,73 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onReply,
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<'image' | 'video' | 'gif' | undefined>(undefined);
   const replyTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Mention State
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionResults, setMentionResults] = useState<User[]>([]);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const [showMentionList, setShowMentionList] = useState(false);
+  const [cursorPosition, setCursorPosition] = useState(0);
+
+  const handleReplyChange = async (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const text = e.target.value;
+    setReplyText(text);
+    const newCursorPos = e.target.selectionStart;
+    setCursorPosition(newCursorPos);
+
+    // Detect if we are typing a mention
+    const wordBeforeCursor = text.slice(0, newCursorPos).split(/\s/).pop();
+    if (wordBeforeCursor && wordBeforeCursor.startsWith('@')) {
+      const query = wordBeforeCursor.slice(1);
+      setMentionQuery(query);
+      setShowMentionList(true);
+
+      // Search users
+      if (query.trim().length > 0) {
+        const results = await searchUsers(query);
+        setMentionResults(results);
+      } else {
+        // Show suggestions (e.g. following or recent) or verified bot
+        setMentionResults([]); // Or fetch suggestions if implemented
+      }
+    } else {
+      setShowMentionList(false);
+      setMentionQuery(null);
+    }
+  };
+
+  const insertMention = (user: User) => {
+    if (!mentionQuery && mentionQuery !== '') return;
+
+    const textBeforeCursor = replyText.slice(0, cursorPosition);
+    const textAfterCursor = replyText.slice(cursorPosition);
+
+    // Find where the @ starts
+    const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+
+    const newText = textBeforeCursor.slice(0, lastAtIndex) + `@${user.handle} ` + textAfterCursor;
+    setReplyText(newText);
+    setShowMentionList(false);
+    setMentionQuery(null);
+    // Focus back handled naturally or we can force it
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (showMentionList && mentionResults.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setMentionIndex(prev => (prev + 1) % mentionResults.length);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setMentionIndex(prev => (prev - 1 + mentionResults.length) % mentionResults.length);
+      } else if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        insertMention(mentionResults[mentionIndex]);
+      } else if (e.key === 'Escape') {
+        setShowMentionList(false);
+      }
+    }
+  };
 
   const handleEmojiClick = (emojiData: EmojiClickData) => {
     setReplyText(prev => prev + emojiData.emoji);
@@ -168,8 +240,8 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onReply,
     if (aiComment) return;
     setAnalyzing(true);
     try {
-      const commentary = await analyzePost(post.content, !!post.image);
-      setAiComment(commentary);
+      const commentary = await analyzePost(post.content, "Judge this post and give a witty verdict (under 30 words).");
+      setAiComment(commentary.content); // Extract content from AIResponse
     } catch (e) {
       console.error(e);
     } finally {
@@ -177,17 +249,51 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onReply,
     }
   };
 
+  const handleAITrigger = (initialQuery: string = '') => {
+    setAiQuery(initialQuery);
+    setShowAI((prev) => !prev);
+  };
+
+  // Intercept Reply Submit for AI Tagging
   const handleReplySubmit = async () => {
     if (!replyText.trim() && !mediaUrl) return;
 
+    let aiTriggerQuery: string | null = null;
+
+    // Check for AI Tag
+    const lowerReply = replyText.toLowerCase();
+    if (lowerReply.includes('@prodigy') || lowerReply.includes('@ai') || lowerReply.includes('@grok')) {
+      // Extract query: remove the tag
+      aiTriggerQuery = replyText.replace(/@(Prodigy|AI|Grok)/gi, '').trim();
+      // We DO NOT return here anymore; we allow the user's comment to post
+    }
+
     try {
-      // Use the prop instead of direct call
+      // 1. Post User's Comment
       await onReply(post.id, replyText, mediaUrl || undefined, mediaType);
+
       setReplyText('');
       setMediaUrl(null);
       setMediaType(undefined);
       setIsReplying(false);
       setShowComments(true); // Show comments after posting
+
+      // 2. Trigger AI Reply if flagged
+      if (aiTriggerQuery || aiTriggerQuery === '') {
+        // Add a small delay/toast or just let it happen in background
+        // We use the cleaned query, or if empty, "Analyze this"
+        const query = aiTriggerQuery || "Analyze this post";
+
+        // Background process
+        analyzePost(post.content, query).then(async (response) => {
+          if (response.content) {
+            const { postAIComment } = await import('../../services/aiService');
+            await postAIComment(post.id, response.content);
+            // Realtime should handle the rest
+          }
+        });
+      }
+
     } catch (error) {
       console.error('Failed to create comment:', error);
       // addToast handled by parent usually, but if parent throws we can catch here? 
@@ -369,7 +475,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onReply,
               <div className="flex gap-2">
                 <Avatar
                   user={post.original_post.user}
-                  alt={post.original_post.user?.name}
+                  alt={post.original_post.user?.name || 'User'}
                   className="w-5 h-5 rounded-full object-cover"
                 />
                 <div className="flex-1 min-w-0">
@@ -507,102 +613,134 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onReply,
                 <Icon icon="ph:share-network" width="18" height="18" />
               </div>
             </div>
+
+            {/* AI Analyze Button */}
+            <div className="group flex items-center gap-1 cursor-pointer -ml-2" onClick={(e) => { e.stopPropagation(); handleAITrigger(); }}>
+              <div className={`p-2 rounded-full transition-colors ${showAI ? 'text-nsp-teal bg-nsp-teal/10' : 'text-gray-500 group-hover:text-nsp-teal group-hover:bg-nsp-teal/10'}`}>
+                <Icon icon={showAI ? "ph:sparkle-fill" : "ph:sparkle"} width="18" height="18" />
+              </div>
+            </div>
           </div>
 
         </div>
       </div>
 
+      {/* AI Analysis Panel */}
+      {
+        showAI && (
+          <div className="px-4 pb-4 animate-in slide-in-from-top-2 duration-200" onClick={(e) => e.stopPropagation()}>
+            <AIAnalysisView
+              postContent={post.content}
+              initialPrompt={aiQuery}
+              onClose={() => setShowAI(false)}
+            />
+          </div>
+        )
+      }
+
       {/* Comments Section */}
-      {showComments && (
-        <div className="mt-4" onClick={(e) => e.stopPropagation()}>
-          {/* Reply Input Area */}
-          <div className="pt-3 border-t border-gray-100">
-            <div className="flex gap-3">
-              <Avatar user={currentUser} className="w-8 h-8 rounded-full object-cover" />
-              <div className="flex-1">
-                <textarea
-                  ref={replyTextareaRef}
-                  className="w-full bg-gray-50 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-nsp-teal/20 text-black placeholder-gray-600 resize-none"
-                  placeholder="Post your reply"
-                  rows={2}
-                  value={replyText}
-                  onChange={(e) => setReplyText(e.target.value)}
-                />
+      {
+        showComments && (
+          <div className="mt-4" onClick={(e) => e.stopPropagation()}>
+            {/* Reply Input Area */}
+            <div className="pt-3 border-t border-gray-100">
+              <div className="flex gap-3">
+                <Avatar user={currentUser} className="w-8 h-8 rounded-full object-cover" />
+                <div className="flex-1 relative">
+                  <textarea
+                    ref={replyTextareaRef}
+                    className="w-full bg-gray-50 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-nsp-teal/20 text-black placeholder-gray-600 resize-none"
+                    placeholder="Post your reply"
+                    rows={2}
+                    value={replyText}
+                    onChange={handleReplyChange}
+                    onKeyDown={handleKeyDown}
+                    onClick={(e) => setCursorPosition(e.currentTarget.selectionStart)}
+                  />
 
-                {mediaUrl && (
-                  <div className="mt-2 relative inline-block">
-                    <img src={mediaUrl} className="max-h-40 rounded-lg" alt="Preview" />
-                    <button
-                      onClick={() => { setMediaUrl(null); setMediaType(undefined); }}
-                      className="absolute top-1 right-1 bg-black/75 text-white rounded-full p-1"
-                    >
-                      <Icon icon="ph:x-bold" width="10" height="10" />
-                    </button>
-                  </div>
-                )}
+                  {showMentionList && (
+                    <MentionList
+                      users={mentionResults}
+                      onSelect={insertMention}
+                      activeIndex={mentionIndex}
+                    />
+                  )}
 
-                <div className="flex justify-between items-center mt-2">
-                  <div className="flex gap-2 relative">
-                    <button onClick={() => { setShowGifPicker(!showGifPicker); setShowEmojiPicker(false); }} className="text-nsp-teal hover:bg-nsp-teal/10 p-1 rounded-full">
-                      <Icon icon="ph:gif" width="20" height="20" />
-                    </button>
-                    <button onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowGifPicker(false); }} className="text-nsp-teal hover:bg-nsp-teal/10 p-1 rounded-full">
-                      <Icon icon="ph:smiley" width="20" height="20" />
-                    </button>
+                  {mediaUrl && (
+                    <div className="mt-2 relative inline-block">
+                      <img src={mediaUrl} className="max-h-40 rounded-lg" alt="Preview" />
+                      <button
+                        onClick={() => { setMediaUrl(null); setMediaType(undefined); }}
+                        className="absolute top-1 right-1 bg-black/75 text-white rounded-full p-1"
+                      >
+                        <Icon icon="ph:x-bold" width="10" height="10" />
+                      </button>
+                    </div>
+                  )}
 
-                    {showGifPicker && (
-                      <div className="absolute top-8 left-0 z-50 shadow-xl">
-                        <div className="fixed inset-0 z-40" onClick={() => setShowGifPicker(false)} />
-                        <div className="relative z-50">
-                          <GifPicker onSelect={handleGifSelect} onClose={() => setShowGifPicker(false)} />
+                  <div className="flex justify-between items-center mt-2">
+                    <div className="flex gap-2 relative">
+                      <button onClick={() => { setShowGifPicker(!showGifPicker); setShowEmojiPicker(false); }} className="text-nsp-teal hover:bg-nsp-teal/10 p-1 rounded-full">
+                        <Icon icon="ph:gif" width="20" height="20" />
+                      </button>
+                      <button onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowGifPicker(false); }} className="text-nsp-teal hover:bg-nsp-teal/10 p-1 rounded-full">
+                        <Icon icon="ph:smiley" width="20" height="20" />
+                      </button>
+
+                      {showGifPicker && (
+                        <div className="absolute top-8 left-0 z-50 shadow-xl">
+                          <div className="fixed inset-0 z-40" onClick={() => setShowGifPicker(false)} />
+                          <div className="relative z-50">
+                            <GifPicker onSelect={handleGifSelect} onClose={() => setShowGifPicker(false)} />
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {showEmojiPicker && (
-                      <div className="absolute top-8 left-0 z-50 shadow-xl">
-                        <div className="fixed inset-0 z-40" onClick={() => setShowEmojiPicker(false)} />
-                        <div className="relative z-50">
-                          <EmojiPicker
-                            onEmojiClick={handleEmojiClick}
-                            theme={Theme.LIGHT}
-                            width={300}
-                            height={350}
-                            previewConfig={{ showPreview: false }}
-                          />
+                      {showEmojiPicker && (
+                        <div className="absolute top-8 left-0 z-50 shadow-xl">
+                          <div className="fixed inset-0 z-40" onClick={() => setShowEmojiPicker(false)} />
+                          <div className="relative z-50">
+                            <EmojiPicker
+                              onEmojiClick={handleEmojiClick}
+                              theme={Theme.LIGHT}
+                              width={300}
+                              height={350}
+                              previewConfig={{ showPreview: false }}
+                            />
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
+                      )}
+                    </div>
 
-                  <div className="flex justify-end">
-                    <button
-                      onClick={handleReplySubmit}
-                      disabled={!replyText.trim() && !mediaUrl}
-                      className="bg-nsp-teal text-white text-sm font-bold px-4 py-1.5 rounded-full disabled:opacity-50 disabled:cursor-not-allowed hover:bg-nsp-dark-teal transition-colors"
-                    >
-                      Reply
-                    </button>
+                    <div className="flex justify-end">
+                      <button
+                        onClick={handleReplySubmit}
+                        disabled={!replyText.trim() && !mediaUrl}
+                        className="bg-nsp-teal text-white text-sm font-bold px-4 py-1.5 rounded-full disabled:opacity-50 disabled:cursor-not-allowed hover:bg-nsp-dark-teal transition-colors"
+                      >
+                        Reply
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Comments List */}
-          {loadingComments ? (
-            <div className="flex justify-center py-4">
-              <Icon icon="line-md:loading-twotone-loop" width="24" height="24" className="text-nsp-teal" />
-            </div>
-          ) : (
-            <CommentThread
-              comments={comments}
-              currentUser={currentUser}
-              onReply={handleCommentReply}
-            />
-          )}
-        </div>
-      )}
+            {/* Comments List */}
+            {loadingComments ? (
+              <div className="flex justify-center py-4">
+                <Icon icon="line-md:loading-twotone-loop" width="24" height="24" className="text-nsp-teal" />
+              </div>
+            ) : (
+              <CommentThread
+                comments={comments}
+                currentUser={currentUser}
+                onReply={handleCommentReply}
+              />
+            )}
+          </div>
+        )
+      }
 
       {/* Quote Re-Rack Modal */}
       {

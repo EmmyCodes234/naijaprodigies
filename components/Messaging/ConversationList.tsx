@@ -68,7 +68,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
             <div className="relative flex-shrink-0">
               <Avatar
                 user={otherParticipant}
-                alt={otherParticipant.name}
+                alt={otherParticipant.name || 'User'}
                 className="w-12 h-12 rounded-full object-cover"
               />
               {hasUnread && (
@@ -81,7 +81,7 @@ const ConversationList: React.FC<ConversationListProps> = ({
               <div className="flex items-start justify-between mb-1">
                 <div className="flex items-center gap-1 min-w-0 flex-1">
                   <span className={`font-bold text-sm truncate ${hasUnread ? 'text-gray-900' : 'text-gray-900'}`}>
-                    {otherParticipant.name}
+                    {otherParticipant.name || 'Unknown User'}
                   </span>
                   <VerifiedBadge user={otherParticipant} size={16} />
                   <span className="text-gray-500 text-sm truncate">

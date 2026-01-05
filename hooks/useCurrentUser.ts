@@ -1,37 +1,27 @@
-import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { getCurrentUser } from '../services/userService';
-import type { User } from '../types';
+import { useQuery } from '@tanstack/react-query';
 
 export const useCurrentUser = () => {
-  const { user: authUser } = useAuth();
-  const [profile, setProfile] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const { user: authUser, loading: authLoading } = useAuth();
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      if (!authUser) {
-        setProfile(null);
-        setLoading(false);
-        return;
-      }
+  const { data: profile, isLoading, error } = useQuery({
+    queryKey: ['currentUser', authUser?.id],
+    queryFn: getCurrentUser,
+    enabled: !!authUser,
+    staleTime: 1000 * 60 * 30, // 30 minutes
+    // Use initial data if we wanted, but caching is enough
+  });
 
-      try {
-        setLoading(true);
-        const userProfile = await getCurrentUser();
-        setProfile(userProfile);
-        setError(null);
-      } catch (err) {
-        setError(err as Error);
-        setProfile(null);
-      } finally {
-        setLoading(false);
-      }
-    };
+  // Combine loading states: 
+  // If auth is loading, we are loading.
+  // If auth is done but no user, we are not loading (profile null).
+  // If auth is done and user exists, we wait for query.
+  const loading = authLoading || (!!authUser && isLoading);
 
-    fetchProfile();
-  }, [authUser]);
-
-  return { profile, loading, error };
+  return {
+    profile: profile || null,
+    loading,
+    error: error as Error | null
+  };
 };

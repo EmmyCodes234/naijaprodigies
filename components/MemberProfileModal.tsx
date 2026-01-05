@@ -54,13 +54,13 @@ const MemberProfileModal: React.FC<MemberProfileModalProps> = ({ member, isOpen,
             <div className="relative">
               <div className="w-32 h-32 md:w-40 md:h-40 rounded-full border-4 border-white shadow-xl overflow-hidden bg-white">
                 <img
-                  src={member.img || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&background=0D9488&color=fff`}
-                  alt={member.name}
+                  src={member.img || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name || 'Member')}&background=0D9488&color=fff`}
+                  alt={member.name || 'Member'}
                   className="w-full h-full object-cover transition-transform hover:scale-110 cursor-zoom-in"
                   referrerPolicy="no-referrer"
                   onClick={() => setShowFullImage(true)}
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&background=0D9488&color=fff`;
+                    (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name || 'Member')}&background=0D9488&color=fff`;
                   }}
                 /></div>
               {member.rank === "Grandmaster" && (
@@ -71,7 +71,7 @@ const MemberProfileModal: React.FC<MemberProfileModalProps> = ({ member, isOpen,
             </div>
 
             <div className="flex-1 pt-14 md:pt-16">
-              <h2 className="text-3xl md:text-4xl font-luckiest text-nsp-dark-teal mb-1">{member.name}</h2>
+              <h2 className="text-3xl md:text-4xl font-luckiest text-nsp-dark-teal mb-1">{member.name || 'Unknown Member'}</h2>
               <p className="text-nsp-orange font-bold text-lg uppercase tracking-wide flex items-center gap-2">
                 {member.title || member.state}
                 <span className="w-1 h-1 rounded-full bg-gray-300"></span>
@@ -150,7 +150,7 @@ const MemberProfileModal: React.FC<MemberProfileModalProps> = ({ member, isOpen,
       {showFullImage && member.img && (
         <ImageViewer
           src={member.img}
-          alt={member.name}
+          alt={member?.name || 'Member'}
           onClose={() => setShowFullImage(false)}
         />
       )}

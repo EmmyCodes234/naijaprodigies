@@ -57,7 +57,7 @@ const CommentItem: React.FC<{
         <div className="flex-shrink-0">
           <Avatar
             user={comment.user}
-            alt={comment.user.name}
+            alt={comment.user?.name || 'User'}
             className="w-8 h-8 rounded-full object-cover"
           />
         </div>
@@ -67,7 +67,7 @@ const CommentItem: React.FC<{
           {/* Header */}
           <div className="flex items-center gap-1 text-sm">
             <span className="font-bold text-gray-900 hover:underline cursor-pointer">
-              {comment.user.name}
+              {comment.user?.name || 'Unknown User'}
             </span>
             <VerifiedBadge user={comment.user} size={14} />
             <span className="text-gray-500">@{comment.user.handle}</span>

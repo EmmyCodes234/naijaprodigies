@@ -1,30 +1,20 @@
 import React, { useState } from 'react';
 import { Icon } from '@iconify/react';
 import MemberProfileModal, { MemberData } from '../MemberProfileModal';
-
-import membersDataRaw from "../../src/data/members.json";
+import { useMembers } from '../../contexts/MembersContext';
 
 const Members: React.FC = () => {
   const [selectedMember, setSelectedMember] = useState<MemberData | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Safeguard against non-array data
-  const safeMembersData = Array.isArray(membersDataRaw) ? membersDataRaw : [];
-
-  const members: MemberData[] = safeMembersData.map(m => ({
-    name: `${m.firstName || ''} ${m.surname || ''}`.trim() || 'Unknown Member',
-    rank: m.category || "Member",
-    title: m.state || "NSP Member",
-    img: m.image || undefined,
-    state: m.state,
-    category: m.category,
-    rating: 'Unrated', // Default rating to avoid issues
-  }));
+  // Use cached members from context
+  const { members } = useMembers();
 
   const filteredMembers = members.filter(m =>
-    m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    m.rank.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (m.state && m.state.toLowerCase().includes(searchTerm.toLowerCase()))
+  (m?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    m?.state?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    m?.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    m?.rank?.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   return (
@@ -54,8 +44,8 @@ const Members: React.FC = () => {
             <div key={i} className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 text-center group border border-gray-100 flex flex-col h-full">
               <div className="w-32 h-32 mx-auto mb-4 rounded-full overflow-hidden border-4 border-nsp-teal group-hover:border-nsp-orange transition-colors relative shadow-md">
                 <img
-                  src={member.img || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name)}&background=0D9488&color=fff`}
-                  alt={member.name}
+                  src={member.img || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name || 'Member')}&background=0D9488&color=fff`}
+                  alt={member.name || 'Member'}
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
                   onError={(e) => {

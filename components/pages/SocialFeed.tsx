@@ -19,6 +19,7 @@ const SocialFeedContent: React.FC<{
   currentUser: any;
   posts: Post[];
   isLoadingPosts: boolean;
+  isFetching: boolean;
   isLoadingMore: boolean;
   hasMore: boolean;
   error: any;
@@ -34,6 +35,7 @@ const SocialFeedContent: React.FC<{
   currentUser,
   posts,
   isLoadingPosts,
+  isFetching,
   isLoadingMore,
   hasMore,
   error,
@@ -50,7 +52,7 @@ const SocialFeedContent: React.FC<{
     const navigate = useNavigate();
 
     // Show loading state (initial load only)
-    if (isLoadingPosts && posts.length === 0) {
+    if ((isLoadingPosts || isFetching) && posts.length === 0) {
       return (
         <div>
           {[...Array(5)].map((_, i) => (
@@ -143,7 +145,7 @@ const SocialFeedContent: React.FC<{
 
         {/* Posts Stream */}
         <div>
-          {posts.length === 0 && !isLoadingPosts ? (
+          {posts.length === 0 && !isLoadingPosts && !isFetching ? (
             <div className="p-8 text-center text-gray-500">
               <Icon icon="ph:chat-circle-dots" width="64" height="64" className="mx-auto mb-4 text-gray-300" />
               <p className="text-lg font-medium mb-2">No posts yet</p>
@@ -208,6 +210,7 @@ const SocialFeed: React.FC = () => {
     hasNextPage,
     isFetchingNextPage,
     isLoading,
+    isFetching,
     error,
   } = useInfiniteQuery({
     queryKey: ['posts', feedType, currentUser?.id],
@@ -494,7 +497,8 @@ const SocialFeed: React.FC = () => {
       <SocialFeedContent
         currentUser={currentUser}
         posts={posts}
-        isLoadingPosts={isLoading}
+        isLoadingPosts={isLoading || userLoading}
+        isFetching={isFetching}
         isLoadingMore={isFetchingNextPage}
         hasMore={hasNextPage}
         error={error}

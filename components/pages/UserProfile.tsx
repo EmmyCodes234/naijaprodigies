@@ -257,7 +257,7 @@ const UserProfile: React.FC = () => {
             </button>
             <div>
               <div className="flex items-center gap-1">
-                <h1 className="text-xl font-bold text-gray-900">{user.name}</h1>
+                <h1 className="text-xl font-bold text-gray-900">{user?.name || 'User'}</h1>
                 <VerifiedBadge user={user} size={18} />
               </div>
               <p className="text-sm text-gray-500">{posts.length} posts</p>
@@ -285,7 +285,7 @@ const UserProfile: React.FC = () => {
                 <div className="relative inline-block">
                   <Avatar
                     user={user}
-                    alt={user.name}
+                    alt={user.name || 'User'}
                     className="w-32 h-32 rounded-full border-4 border-white object-cover bg-white"
                   />
                   {user.rank === 'Grandmaster' && (
@@ -326,7 +326,7 @@ const UserProfile: React.FC = () => {
 
             <div className="mb-4">
               <div className="flex items-center gap-2 mb-1">
-                <h2 className="text-2xl font-bold text-gray-900">{user.name}</h2>
+                <h2 className="text-2xl font-bold text-gray-900">{user.name || 'Unknown User'}</h2>
                 <VerifiedBadge user={user} size={24} />
               </div>
               <p className="text-gray-500">@{user.handle}</p>

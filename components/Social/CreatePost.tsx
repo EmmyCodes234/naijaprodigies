@@ -299,7 +299,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ currentUser, onPost }) => {
       <div className="flex-shrink-0 pt-1">
         <Avatar
           user={currentUser}
-          alt={currentUser.name}
+          alt={currentUser?.name || 'User'}
           className="w-10 h-10 rounded-full object-cover hover:opacity-90 cursor-pointer"
         />
       </div>

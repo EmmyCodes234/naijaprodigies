@@ -32,13 +32,20 @@ import { GistProvider } from './contexts/GistContext';
 import GistDock from './components/Gist/GistDock';
 import GistRoom from './components/Gist/GistRoom';
 import GistJoinHandler from './components/Gist/GistJoinHandler';
+import { MembersProvider } from './contexts/MembersContext';
 
-// Wrapper to ensure scroll to top on route change
-const ScrollToTop = () => {
+// Smart Scroll Restoration - preserves scroll on back/forward navigation
+const ScrollRestoration = () => {
   const { pathname } = useLocation();
 
   React.useEffect(() => {
-    window.scrollTo(0, 0);
+    // Check if this is a back/forward navigation
+    const isBackForward = window.performance?.navigation?.type === 2;
+
+    if (!isBackForward) {
+      // Only scroll to top on new navigation (not back/forward)
+      window.scrollTo(0, 0);
+    }
   }, [pathname]);
 
   return null;
@@ -173,14 +180,16 @@ const App: React.FC = () => {
     <Router>
       <AuthProvider>
         <QueryProvider>
-          <ToastProvider>
-            <NotificationProvider>
-              <GistProvider>
-                <ScrollToTop />
-                <AppContent />
-              </GistProvider>
-            </NotificationProvider>
-          </ToastProvider>
+          <MembersProvider>
+            <ToastProvider>
+              <NotificationProvider>
+                <GistProvider>
+                  <ScrollRestoration />
+                  <AppContent />
+                </GistProvider>
+              </NotificationProvider>
+            </ToastProvider>
+          </MembersProvider>
         </QueryProvider>
       </AuthProvider>
     </Router>

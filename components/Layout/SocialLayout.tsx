@@ -276,7 +276,7 @@ const SocialLayout: React.FC<SocialLayoutProps> = ({ children, showWidgets = tru
                             <Avatar user={currentUser} alt="Me" className="w-10 h-10 rounded-full object-cover" />
                             <div className="hidden xl:block flex-1 overflow-hidden">
                                 <div className="flex items-center gap-1">
-                                    <p className="font-bold text-[15px] truncate text-gray-900">{currentUser.name}</p>
+                                    <p className="font-bold text-[15px] truncate text-gray-900">{currentUser?.name || 'User'}</p>
                                     <VerifiedBadge user={currentUser} size={16} />
                                 </div>
                                 <p className="text-gray-500 text-[15px] truncate">@{currentUser.handle}</p>
@@ -336,16 +336,16 @@ const SocialLayout: React.FC<SocialLayoutProps> = ({ children, showWidgets = tru
                         <div className="p-4 py-3">
                             <h3 className="font-extrabold text-[20px] text-gray-900 mb-3">Who to follow</h3>
                             <div className="space-y-0">
-                                {suggestedUsers.map((user) => (
+                                {suggestedUsers.filter(u => u != null).map((user) => (
                                     <div key={user.id} className="flex items-center gap-3 hover:bg-gray-100 -mx-4 px-4 py-3 cursor-pointer transition-colors" onClick={() => navigate(`/profile/${user.id}`)}>
                                         <Avatar
                                             user={user}
-                                            alt={user.name}
+                                            alt={user.name || 'User'}
                                             className="w-10 h-10 rounded-full object-cover"
                                         />
                                         <div className="flex-1 overflow-hidden">
                                             <div className="font-bold text-[15px] text-gray-900 hover:underline truncate flex items-center gap-1">
-                                                {user.name}
+                                                {user.name || 'Unknown User'}
                                                 <VerifiedBadge user={user} size={14} />
                                             </div>
                                             <div className="text-[15px] text-gray-500 truncate">@{user.handle}</div>

@@ -36,10 +36,10 @@ const NotificationItem: React.FC<{ notification: NotificationModel; onClick: () 
                 <div className="flex items-center gap-2 mb-1">
                     <img
                         src={notification.actor_avatar || '/default-avatar.png'}
-                        alt={notification.actor_name}
+                        alt={notification.actor_name || 'User'}
                         className="w-8 h-8 rounded-full object-cover"
                     />
-                    <span className="font-bold text-gray-900">{notification.actor_name}</span>
+                    <span className="font-bold text-gray-900">{notification.actor_name || 'Unknown User'}</span>
                     <VerifiedBadge user={{ verified: notification.actor_verified, verification_type: notification.actor_verification_type } as any} size={14} />
                     <span className="text-gray-500 text-sm">@{notification.actor_handle}</span>
                     <span className="text-gray-400 text-sm">· {formatRelativeTime(notification.created_at)}</span>

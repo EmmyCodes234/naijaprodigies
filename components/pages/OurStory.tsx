@@ -1,9 +1,11 @@
 import React, { useEffect, useRef } from 'react';
 import { Icon } from '@iconify/react';
+import { useAnimationOnce } from '../../hooks/useAnimationOnce';
 
 const OurStory: React.FC = () => {
   // Hook for scroll animations
   const observerRef = useRef<IntersectionObserver | null>(null);
+  const hasAnimated = useAnimationOnce('our-story');
 
   useEffect(() => {
     const observer = new IntersectionObserver((entries) => {
@@ -17,12 +19,18 @@ const OurStory: React.FC = () => {
 
     observerRef.current = observer;
 
-    document.querySelectorAll('.timeline-item').forEach((el) => {
-      observer.observe(el);
+    const items = document.querySelectorAll('.timeline-item');
+    items.forEach((el) => {
+      // If already animated, skip the animation
+      if (hasAnimated) {
+        el.classList.add('animate-slide-up-fade');
+      } else {
+        observer.observe(el);
+      }
     });
 
     return () => observer.disconnect();
-  }, []);
+  }, [hasAnimated]);
 
   const milestones = [
     {

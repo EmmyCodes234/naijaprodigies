@@ -110,10 +110,10 @@ const NewMessageModal: React.FC<NewMessageModalProps> = ({ isOpen, onClose, curr
                                     onClick={() => handleSelectUser(user.id)}
                                     className="w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left"
                                 >
-                                    <img src={getAvatarUrl(user)} alt={user.name} className="w-10 h-10 rounded-full object-cover bg-gray-200" />
+                                    <img src={getAvatarUrl(user)} alt={user.name || 'User'} className="w-10 h-10 rounded-full object-cover bg-gray-200" />
                                     <div className="flex-1">
                                         <div className="flex items-center gap-1">
-                                            <span className="font-bold text-gray-900">{user.name}</span>
+                                            <span className="font-bold text-gray-900">{user.name || 'Unknown User'}</span>
                                             <VerifiedBadge user={user} size={16} />
                                         </div>
                                         <span className="text-gray-500 text-sm">@{user.handle}</span>
