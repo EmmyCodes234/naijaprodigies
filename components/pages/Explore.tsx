@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getTrends, searchPosts, likePost, unlikePost, createComment } from '../../services/postService';
 import { searchUsers, followUser } from '../../services/userService';
 import { fetchNews, getRelativeTime, NewsArticle } from '../../services/newsService';
@@ -31,6 +31,15 @@ const Explore: React.FC = () => {
     const [users, setUsers] = useState<User[]>([]);
     const [newsArticles, setNewsArticles] = useState<NewsArticle[]>([]);
     const [isLoadingNews, setIsLoadingNews] = useState(true);
+
+    // Autocomplete state
+    const [suggestions, setSuggestions] = useState<User[]>([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [isSearchingUsers, setIsSearchingUsers] = useState(false);
+    const [followingMap, setFollowingMap] = useState<Record<string, boolean>>({});
+    const [loadingFollow, setLoadingFollow] = useState<string | null>(null);
+    const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const searchContainerRef = useRef<HTMLDivElement>(null);
 
     // Fetch trends on mount
     useEffect(() => {
@@ -106,6 +115,101 @@ const Explore: React.FC = () => {
         performSearch(tag);
     };
 
+    // Live autocomplete search with debounce
+    useEffect(() => {
+        if (searchTimeoutRef.current) {
+            clearTimeout(searchTimeoutRef.current);
+        }
+
+        const query = searchQuery.trim();
+        if (!query || query.length < 1) {
+            setSuggestions([]);
+            setShowSuggestions(false);
+            return;
+        }
+
+        // Debounce the search
+        searchTimeoutRef.current = setTimeout(async () => {
+            setIsSearchingUsers(true);
+            try {
+                // If query starts with @, strip it for the search
+                const searchTerm = query.startsWith('@') ? query.slice(1) : query;
+                if (!searchTerm) {
+                    setSuggestions([]);
+                    return;
+                }
+
+                const results = await searchUsers(searchTerm);
+                setSuggestions(results.slice(0, 8)); // Limit to 8 suggestions
+                setShowSuggestions(true);
+
+                // Check follow status for suggestions
+                if (currentUser && results.length > 0) {
+                    const { isFollowing } = await import('../../services/followService');
+                    const statuses: Record<string, boolean> = {};
+                    await Promise.all(
+                        results.slice(0, 8).map(async (user) => {
+                            if (user.id !== currentUser.id) {
+                                statuses[user.id] = await isFollowing(currentUser.id, user.id);
+                            }
+                        })
+                    );
+                    setFollowingMap(prev => ({ ...prev, ...statuses }));
+                }
+            } catch (error) {
+                console.error('Autocomplete search failed:', error);
+            } finally {
+                setIsSearchingUsers(false);
+            }
+        }, 300);
+
+        return () => {
+            if (searchTimeoutRef.current) {
+                clearTimeout(searchTimeoutRef.current);
+            }
+        };
+    }, [searchQuery, currentUser]);
+
+    // Close suggestions when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+                setShowSuggestions(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const handleSuggestionClick = (user: User) => {
+        navigate(`/profile/${user.handle}`);
+        setShowSuggestions(false);
+        setSearchQuery('');
+    };
+
+    const handleFollowClick = async (e: React.MouseEvent, userId: string) => {
+        e.stopPropagation();
+        if (!currentUser || loadingFollow) return;
+
+        const { followUser: follow, unfollowUser: unfollow } = await import('../../services/followService');
+
+        setLoadingFollow(userId);
+        try {
+            const isCurrentlyFollowing = followingMap[userId];
+            if (isCurrentlyFollowing) {
+                await unfollow(currentUser.id, userId);
+            } else {
+                await follow(currentUser.id, userId);
+            }
+            setFollowingMap(prev => ({ ...prev, [userId]: !isCurrentlyFollowing }));
+        } catch (error) {
+            console.error('Follow error:', error);
+            addToast('error', 'Failed to update follow status');
+        } finally {
+            setLoadingFollow(null);
+        }
+    };
+
     // Post Card Handlers
     const handleLike = async (postId: string) => {
         if (!currentUser) return;
@@ -150,16 +254,66 @@ const Explore: React.FC = () => {
             <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-gray-100">
                 {/* Search Bar */}
                 <div className="px-4 py-2 flex items-center gap-3">
-                    <div className="relative flex-1">
-                        <Icon icon="ph:magnifying-glass" className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" width="18" height="18" />
+                    <div ref={searchContainerRef} className="relative flex-1">
+                        <Icon icon="ph:magnifying-glass" className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 z-10" width="18" height="18" />
                         <input
                             type="text"
-                            placeholder="Search"
+                            placeholder="Search people, posts, or @handles"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             onKeyDown={handleKeyDown}
+                            onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
                             className="w-full bg-gray-100 border-none rounded-full py-2.5 pl-11 pr-4 focus:ring-2 focus:ring-nsp-teal/50 focus:bg-white transition-all outline-none text-gray-900 placeholder-gray-500 text-[15px]"
                         />
+                        {isSearchingUsers && (
+                            <Icon icon="line-md:loading-loop" className="absolute right-4 top-1/2 -translate-y-1/2 text-nsp-teal" width="18" height="18" />
+                        )}
+
+                        {/* Autocomplete Dropdown */}
+                        {showSuggestions && suggestions.length > 0 && (
+                            <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-2xl shadow-xl max-h-[400px] overflow-y-auto z-50">
+                                <div className="px-4 py-2 text-xs font-bold text-gray-500 uppercase tracking-wide bg-gray-50/50 rounded-t-2xl">
+                                    People
+                                </div>
+                                {suggestions.map((user) => (
+                                    <div
+                                        key={user.id}
+                                        onClick={() => handleSuggestionClick(user)}
+                                        className="px-4 py-3 flex items-center gap-3 hover:bg-gray-50 cursor-pointer transition-colors"
+                                    >
+                                        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-nsp-orange to-nsp-teal flex items-center justify-center text-white font-bold flex-shrink-0 overflow-hidden">
+                                            {user.avatar ? (
+                                                <img src={user.avatar} alt={user.name || 'User'} className="w-full h-full object-cover" />
+                                            ) : (
+                                                (user.name || '?').charAt(0).toUpperCase()
+                                            )}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-1">
+                                                <span className="font-bold text-[15px] text-gray-900 truncate">{user.name || 'Unknown'}</span>
+                                                <VerifiedBadge user={user} size={16} />
+                                            </div>
+                                            <div className="text-[15px] text-gray-500 truncate">@{user.handle}</div>
+                                        </div>
+                                        {currentUser && user.id !== currentUser.id && (
+                                            <button
+                                                onClick={(e) => handleFollowClick(e, user.id)}
+                                                disabled={loadingFollow === user.id}
+                                                className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all flex-shrink-0
+                                                    ${followingMap[user.id]
+                                                        ? 'bg-white border border-gray-300 text-gray-900 hover:border-red-300 hover:text-red-600'
+                                                        : 'bg-gray-900 text-white hover:bg-black'
+                                                    } disabled:opacity-50`}
+                                            >
+                                                {loadingFollow === user.id ? (
+                                                    <Icon icon="line-md:loading-loop" width="16" height="16" />
+                                                ) : followingMap[user.id] ? 'Following' : 'Follow'}
+                                            </button>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                     <button
                         onClick={() => setIsSettingsOpen(true)}
