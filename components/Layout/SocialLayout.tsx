@@ -15,6 +15,7 @@ import { getAvatarUrl } from '../../utils/userUtils';
 import Avatar from '../Shared/Avatar';
 import MoreMenu from './MoreMenu';
 import CreateGistModal from '../Gist/CreateGistModal';
+import FollowButton from '../FollowButton';
 
 interface SocialLayoutProps {
     children: React.ReactNode;
@@ -325,7 +326,10 @@ const SocialLayout: React.FC<SocialLayoutProps> = ({ children, showWidgets = tru
                             ) : (
                                 <div className="text-gray-500 text-sm">No trends right now</div>
                             )}
-                            <div className="mt-2 text-nsp-teal text-[15px] cursor-pointer hover:bg-gray-100 -mx-4 px-4 py-3 transition-colors block text-left">
+                            <div
+                                className="mt-2 text-nsp-teal text-[15px] cursor-pointer hover:bg-gray-100 -mx-4 px-4 py-3 transition-colors block text-left"
+                                onClick={() => navigate('/explore')}
+                            >
                                 Show more
                             </div>
                         </div>
@@ -350,22 +354,21 @@ const SocialLayout: React.FC<SocialLayoutProps> = ({ children, showWidgets = tru
                                             </div>
                                             <div className="text-[15px] text-gray-500 truncate">@{user.handle}</div>
                                         </div>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                onFollowUser(user.id);
-                                            }}
-                                            className="bg-black hover:bg-gray-800 text-white text-sm font-bold py-1.5 px-4 rounded-full transition-colors"
-                                        >
-                                            Follow
-                                        </button>
+                                        <FollowButton
+                                            targetUserId={user.id}
+                                            currentUserId={currentUser?.id || ''}
+                                            initialFollowState={false}
+                                        />
                                     </div>
                                 ))}
                                 {suggestedUsers.length === 0 && (
                                     <div className="text-gray-500 text-sm">No suggestions right now</div>
                                 )}
                             </div>
-                            <div className="mt-2 text-nsp-teal text-[15px] cursor-pointer hover:bg-gray-100 -mx-4 px-4 py-3 transition-colors block text-left">
+                            <div
+                                className="mt-2 text-nsp-teal text-[15px] cursor-pointer hover:bg-gray-100 -mx-4 px-4 py-3 transition-colors block text-left"
+                                onClick={() => navigate('/members')}
+                            >
                                 Show more
                             </div>
                         </div>

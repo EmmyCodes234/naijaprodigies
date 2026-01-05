@@ -52,6 +52,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onReply,
 
   const [showMenu, setShowMenu] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showShareMenu, setShowShareMenu] = useState(false);
 
   // Media state for reply
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -150,6 +151,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onReply,
     const closeMenus = () => {
       setShowMenu(false);
       setShowReRackMenu(false);
+      setShowShareMenu(false);
     }
     document.addEventListener('click', closeMenus);
     return () => document.removeEventListener('click', closeMenus);
@@ -471,7 +473,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onReply,
 
           {/* Original Post for Quote Re-Racks */}
           {post.is_rerack && post.original_post && (
-            <div className="mt-2 mb-2 border border-gray-200 rounded-2xl p-4 hover:bg-black/[0.02] transition-colors cursor-pointer" onClick={(e) => { e.stopPropagation(); navigate(`/post/${post.original_post!.id}`) }}>
+            <div className="mt-2 mb-2 border border-gray-200 rounded-2xl p-3 hover:bg-black/[0.02] transition-colors cursor-pointer" onClick={(e) => { e.stopPropagation(); navigate(`/post/${post.original_post!.id}`) }}>
               <div className="flex gap-2">
                 <Avatar
                   user={post.original_post.user}
@@ -480,13 +482,13 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onReply,
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1 text-[15px]">
-                    <span className="font-bold text-gray-900 leading-tight">{post.original_post.user?.name || 'Unknown User'}</span>
+                    <span className="font-bold text-gray-900 leading-tight truncate">{post.original_post.user?.name || 'Unknown User'}</span>
                     <VerifiedBadge user={post.original_post.user} size={14} />
-                    <span className="text-gray-500 truncate">@{post.original_post.user?.handle || 'unknown'}</span>
+                    <span className="text-gray-500 truncate">@{post.original_post.user?.handle.replace(/^@/, '') || 'unknown'}</span>
                     <span className="text-gray-500">·</span>
-                    <span className="text-gray-500">{formatRelativeTime(post.original_post.created_at)}</span>
+                    <span className="text-gray-500 text-sm whitespace-nowrap">{formatRelativeTime(post.original_post.created_at)}</span>
                   </div>
-                  <div className="mt-1 text-gray-900 text-[15px] leading-6">
+                  <div className="mt-0.5 text-gray-900 text-[15px] leading-snug line-clamp-3">
                     {renderContentWithLinks(post.original_post.content)}
                   </div>
                 </div>
@@ -494,7 +496,8 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onReply,
             </div>
           )}
 
-          {/* Poll Display */}
+          {/* ... (Poll/Media Skipped, kept unchanged) ... */}
+
           {post.poll_id && (
             <PollDisplay pollId={post.poll_id} currentUserId={currentUser.id} />
           )}
@@ -521,10 +524,9 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onReply,
               ) : (
                 <div className={`mb-2 mt-2 grid gap-0.5 rounded-2xl overflow-hidden border border-gray-200 ${post.images.length === 1 ? 'grid-cols-1' :
                   post.images.length === 2 ? 'grid-cols-2' :
-                    post.images.length === 3 ? 'grid-cols-2' : // 3 images: usually split
+                    post.images.length === 3 ? 'grid-cols-2' :
                       'grid-cols-2'
                   }`}>
-                  {/* Simplified Grid: 3 images handled as 2 cols, 2 rows? For now keep simple grid */}
                   {post.images.map((image, index) => (
                     <div key={index} className="overflow-hidden bg-gray-100">
                       <img src={image} alt={`Post media ${index + 1}`} className="w-full h-full object-cover min-h-[200px]" loading="lazy" />
@@ -546,29 +548,26 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onReply,
             </div>
           )}
 
-          {/* Action Bar */}
-          <div className="flex justify-between items-center w-full md:max-w-[425px] mt-3 pr-2 md:pr-0">
+          {/* Action Bar - X.com Style */}
+          <div className="flex justify-between items-center w-full mt-3 max-w-[425px]">
 
-            {/* Reply */}
-            <div className="group flex items-center gap-1 cursor-pointer -ml-2" onClick={toggleComments}>
-              <div className="p-2 rounded-full group-hover:bg-[#1d9bf0]/10 text-gray-500 group-hover:text-[#1d9bf0] transition-colors">
+            {/* Reply (Blue) */}
+            <div className="group flex items-center gap-0.5 cursor-pointer -ml-2" onClick={toggleComments} title="Reply">
+              <div className="p-2 rounded-full group-hover:bg-[#1d9bf0]/10 text-gray-500 group-hover:text-[#1d9bf0] transition-colors relative">
                 <Icon icon="ph:chat-circle" width="18" height="18" />
               </div>
-              <span className="text-[13px] text-gray-500 group-hover:text-[#1d9bf0] transition-colors">{post.comments_count || ''}</span>
+              {post.comments_count > 0 && <span className="text-[13px] text-gray-500 group-hover:text-[#1d9bf0] transition-colors tabular-nums">{post.comments_count}</span>}
             </div>
 
-            {/* Re-Rack */}
-            <div className="group flex items-center gap-1 cursor-pointer -ml-2 relative">
-              <div
-                className="p-2 rounded-full group-hover:bg-[#00ba7c]/10 text-gray-500 group-hover:text-[#00ba7c] transition-colors"
-                onClick={handleReRackClick}
-              >
+            {/* Re-Rack (Green) */}
+            <div className="group flex items-center gap-0.5 cursor-pointer relative" onClick={handleReRackClick} title="Re-Rack">
+              <div className="p-2 rounded-full group-hover:bg-[#00ba7c]/10 text-gray-500 group-hover:text-[#00ba7c] transition-colors">
                 <Icon icon="ph:repeat-bold" width="18" height="18" />
               </div>
-              <span className="text-[13px] text-gray-500 group-hover:text-[#00ba7c] transition-colors">{post.reracks_count || ''}</span>
-              {/* Menu */}
+              {post.reracks_count > 0 && <span className="text-[13px] text-gray-500 group-hover:text-[#00ba7c] transition-colors tabular-nums">{post.reracks_count}</span>}
+              {/* Re-Rack Menu */}
               {showReRackMenu && (
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-20 min-w-[160px]" onClick={(e) => e.stopPropagation()}>
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-white rounded-xl shadow-[0_0_15px_rgba(0,0,0,0.1)] border border-gray-100 py-2 z-20 min-w-[160px]" onClick={(e) => e.stopPropagation()}>
                   <button onClick={handleSimpleReRack} className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 text-gray-900 font-bold text-[14px]">
                     <Icon icon="ph:repeat-bold" width="18" height="18" /> Re-Rack
                   </button>
@@ -579,49 +578,122 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onReply,
               )}
             </div>
 
-  // ... inside return ...
-            {/* Like */}
-            <div className="group flex items-center gap-1 cursor-pointer -ml-2" onClick={(e) => { e.stopPropagation(); onLike(post.id, !!post.is_liked_by_current_user); }}>
+            {/* Like (Pink/Red) */}
+            <div className="group flex items-center gap-0.5 cursor-pointer" onClick={(e) => { e.stopPropagation(); onLike(post.id, !!post.is_liked_by_current_user); }} title="Like">
               <div className="p-2 rounded-full group-hover:bg-[#f91880]/10 text-gray-500 group-hover:text-[#f91880] transition-colors">
                 <Icon icon={post.is_liked_by_current_user ? "ph:heart-fill" : "ph:heart"} width="18" height="18" className={post.is_liked_by_current_user ? "text-[#f91880]" : ""} />
               </div>
-              <span className={`text-[13px] ${post.is_liked_by_current_user ? "text-[#f91880]" : "text-gray-500 group-hover:text-[#f91880]"} transition-colors`}>{post.likes_count || ''}</span>
+              {post.likes_count > 0 && <span className={`text-[13px] tabular-nums ${post.is_liked_by_current_user ? "text-[#f91880]" : "text-gray-500 group-hover:text-[#f91880]"} transition-colors`}>{post.likes_count}</span>}
             </div>
-            {/* ... other code ... */}
-            {/* View/Stats */}
-            <div className="group flex items-center gap-1 cursor-pointer -ml-2">
+
+            {/* Views (Blue) */}
+            <div className="group flex items-center gap-0.5 cursor-pointer" title="Views">
               <div className="p-2 rounded-full group-hover:bg-[#1d9bf0]/10 text-gray-500 group-hover:text-[#1d9bf0] transition-colors">
                 <Icon icon="ph:chart-bar" width="18" height="18" />
               </div>
-              <span className="text-[13px] text-gray-500 group-hover:text-[#1d9bf0] transition-colors">
-                {post.impressions_count > 0 ? (
-                  post.impressions_count >= 1000 ? `${(post.impressions_count / 1000).toFixed(1)}k` : post.impressions_count
-                ) : ''}
-              </span>
+              {post.impressions_count > 0 && <span className="text-[13px] text-gray-500 group-hover:text-[#1d9bf0] transition-colors tabular-nums">
+                {post.impressions_count >= 1000 ? `${(post.impressions_count / 1000).toFixed(1)}k` : post.impressions_count}
+              </span>}
             </div>
 
-            {/* Bookmark */}
-            <div className="group flex items-center gap-1 cursor-pointer -ml-2" onClick={handleBookmark}>
-              <div className="p-2 rounded-full group-hover:bg-[#1d9bf0]/10 text-gray-500 group-hover:text-[#1d9bf0] transition-colors">
-                <Icon icon={isBookmarked ? "ph:bookmark-fill" : "ph:bookmark"} width="18" height="18" className={isBookmarked ? "text-[#1d9bf0]" : ""} />
+            {/* Bookmark & Share (Grouped right or separate?) - Keeping separate for coverage */}
+            <div className="flex items-center gap-2">
+              {/* Bookmark (Blue) */}
+              <div className="group flex items-center cursor-pointer" onClick={handleBookmark} title="Bookmark">
+                <div className="p-2 rounded-full group-hover:bg-[#1d9bf0]/10 text-gray-500 group-hover:text-[#1d9bf0] transition-colors">
+                  <Icon icon={isBookmarked ? "ph:bookmark-fill" : "ph:bookmark"} width="18" height="18" className={isBookmarked ? "text-[#1d9bf0]" : ""} />
+                </div>
               </div>
+
+              {/* Share (Blue) */}
+              <div className="group flex items-center gap-0.5 cursor-pointer relative" onClick={(e) => { e.stopPropagation(); setShowShareMenu(!showShareMenu); }} title="Share">
+                <div className="p-2 rounded-full group-hover:bg-[#1d9bf0]/10 text-gray-500 group-hover:text-[#1d9bf0] transition-colors">
+                  <Icon icon="ph:share-network" width="18" height="18" />
+                </div>
+
+                {/* Share Menu */}
+                {showShareMenu && (
+                  <div className="absolute top-full right-0 mt-2 bg-white rounded-xl shadow-[0_0_15px_rgba(0,0,0,0.1)] border border-gray-100 py-2 z-50 min-w-[200px]" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigator.clipboard.writeText(`${window.location.origin}/post/${post.id}`);
+                        addToast('success', 'Link copied to clipboard');
+                        setShowShareMenu(false);
+                      }}
+                      className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 text-gray-900 font-bold text-[14px]"
+                    >
+                      <Icon icon="ph:link" width="18" height="18" /> Copy link
+                    </button>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (navigator.share) {
+                          navigator.share({
+                            title: `Post by ${post.user.name}`,
+                            text: post.content,
+                            url: `${window.location.origin}/post/${post.id}`
+                          }).catch(console.error);
+                        } else {
+                          // Fallback
+                          addToast('info', 'Sharing not supported on this device');
+                        }
+                        setShowShareMenu(false);
+                      }}
+                      className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 text-gray-900 font-bold text-[14px]"
+                    >
+                      <Icon icon="ph:share-fat" width="18" height="18" /> Share via...
+                    </button>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/messages?user=${post.user.id}`);
+                        setShowShareMenu(false);
+                      }}
+                      className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 text-gray-900 font-bold text-[14px]"
+                    >
+                      <Icon icon="ph:envelope-simple" width="18" height="18" /> Send via DM
+                    </button>
+
+                    <div className="h-px bg-gray-100 my-1"></div>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(post.content)}&url=${encodeURIComponent(`${window.location.origin}/post/${post.id}`)}`, '_blank');
+                        setShowShareMenu(false);
+                      }}
+                      className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 text-gray-900 font-bold text-[14px]"
+                    >
+                      <Icon icon="logos:twitter" width="16" height="16" /> Post on X
+                    </button>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.open(`https://wa.me/?text=${encodeURIComponent(`${post.content} - ${window.location.origin}/post/${post.id}`)}`, '_blank');
+                        setShowShareMenu(false);
+                      }}
+                      className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 text-gray-900 font-bold text-[14px]"
+                    >
+                      <Icon icon="logos:whatsapp-icon" width="16" height="16" /> Send via WhatsApp
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* AI Analyze Button (Teal) */}
+              <div className="group flex items-center cursor-pointer" onClick={(e) => { e.stopPropagation(); handleAITrigger(); }} title="Prodigy AI">
+                <div className={`p-2 rounded-full transition-colors ${showAI ? 'text-nsp-teal bg-nsp-teal/10' : 'text-gray-500 group-hover:text-nsp-teal group-hover:bg-nsp-teal/10'} hover:animate-pulse`}>
+                  <Icon icon={showAI ? "ph:sparkle-fill" : "ph:sparkle"} width="18" height="18" />
+                </div>
+              </div>
+
             </div>
 
-            {/* Share */}
-            <div className="group flex items-center gap-1 cursor-pointer -ml-2">
-              <div className="p-2 rounded-full group-hover:bg-[#1d9bf0]/10 text-gray-500 group-hover:text-[#1d9bf0] transition-colors">
-                <Icon icon="ph:share-network" width="18" height="18" />
-              </div>
-            </div>
-
-            {/* AI Analyze Button */}
-            <div className="group flex items-center gap-1 cursor-pointer -ml-2" onClick={(e) => { e.stopPropagation(); handleAITrigger(); }}>
-              <div className={`p-2 rounded-full transition-colors ${showAI ? 'text-nsp-teal bg-nsp-teal/10' : 'text-gray-500 group-hover:text-nsp-teal group-hover:bg-nsp-teal/10'}`}>
-                <Icon icon={showAI ? "ph:sparkle-fill" : "ph:sparkle"} width="18" height="18" />
-              </div>
-            </div>
           </div>
-
         </div>
       </div>
 
