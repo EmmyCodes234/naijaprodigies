@@ -20,7 +20,7 @@ export interface User {
   bio: string | null;
   rank: string | null;
   verified: boolean;
-  verification_type?: 'none' | 'green' | 'gold' | 'grey';
+  verification_type?: 'none' | 'green' | 'gold' | 'grey' | 'blue';
   cover_url?: string | null;
   website?: string | null;
   location?: string | null;

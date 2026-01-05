@@ -27,6 +27,8 @@ const VerifiedBadge: React.FC<VerifiedBadgeProps> = ({ user, className = "", siz
         badgeColor = "text-[#9ca3af]"; // Neutral Grey
     } else if (type === 'green') {
         badgeColor = "text-nsp-teal"; // Individual Green
+    } else if (type === 'blue') {
+        badgeColor = "text-[#1d9bf0]"; // X Blue
     }
 
     return (
