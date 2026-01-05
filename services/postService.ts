@@ -729,7 +729,9 @@ export const createComment = async (
     created_at: commentData.created_at,
     replies: [],
     media_url: commentData.media_url,
-    media_type: commentData.media_type
+    media_type: commentData.media_type,
+    likes_count: 0,
+    is_liked_by_current_user: false
   }
 }
 
@@ -776,6 +778,23 @@ export const getComments = async (postId: string): Promise<Comment[]> => {
   // Build a map of comments by ID for easy lookup
   const commentsMap = new Map<string, Comment>()
   const rootComments: Comment[] = []
+  const commentIds = commentsData.map((c: any) => c.id)
+
+  // Fetch likes counts for all comments
+  const { data: likesData } = await supabase
+    .from('comment_likes')
+    .select('comment_id, user_id')
+    .in('comment_id', commentIds)
+
+  // Build likes count map and liked by current user set
+  const likesCounts: Record<string, number> = {}
+  const likedByUser = new Set<string>()
+
+  if (likesData) {
+    likesData.forEach((like: any) => {
+      likesCounts[like.comment_id] = (likesCounts[like.comment_id] || 0) + 1
+    })
+  }
 
   // First pass: create all comment objects
   commentsData.forEach((comment: any) => {
@@ -789,7 +808,9 @@ export const getComments = async (postId: string): Promise<Comment[]> => {
       created_at: comment.created_at,
       replies: [],
       media_url: comment.media_url,
-      media_type: comment.media_type
+      media_type: comment.media_type,
+      likes_count: likesCounts[comment.id] || 0,
+      is_liked_by_current_user: likedByUser.has(comment.id)
     }
     commentsMap.set(comment.id, commentObj)
   })
@@ -810,6 +831,34 @@ export const getComments = async (postId: string): Promise<Comment[]> => {
   })
 
   return rootComments
+}
+
+/**
+ * Like a comment
+ */
+export const likeComment = async (commentId: string, userId: string): Promise<void> => {
+  const { error } = await supabase
+    .from('comment_likes')
+    .insert({ comment_id: commentId, user_id: userId })
+
+  if (error && !error.message.includes('duplicate')) {
+    throw new Error(`Failed to like comment: ${error.message}`)
+  }
+}
+
+/**
+ * Unlike a comment
+ */
+export const unlikeComment = async (commentId: string, userId: string): Promise<void> => {
+  const { error } = await supabase
+    .from('comment_likes')
+    .delete()
+    .eq('comment_id', commentId)
+    .eq('user_id', userId)
+
+  if (error) {
+    throw new Error(`Failed to unlike comment: ${error.message}`)
+  }
 }
 
 /**

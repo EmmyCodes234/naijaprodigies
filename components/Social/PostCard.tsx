@@ -314,6 +314,19 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onReply,
     }
   };
 
+  const handleCommentLike = async (commentId: string, isCurrentlyLiked: boolean) => {
+    try {
+      const { likeComment, unlikeComment } = await import('../../services/postService');
+      if (isCurrentlyLiked) {
+        await unlikeComment(commentId, currentUser.id);
+      } else {
+        await likeComment(commentId, currentUser.id);
+      }
+    } catch (error) {
+      console.error('Failed to like/unlike comment:', error);
+    }
+  };
+
   const toggleComments = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!isDetailView) {
@@ -808,6 +821,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onReply,
                 comments={comments}
                 currentUser={currentUser}
                 onReply={handleCommentReply}
+                onLike={handleCommentLike}
                 postAuthorHandle={post.user.handle}
               />
             )}

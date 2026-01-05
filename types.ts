@@ -65,6 +65,8 @@ export interface Comment {
   replies?: Comment[];
   media_url?: string;
   media_type?: 'image' | 'video' | 'gif';
+  likes_count: number;
+  is_liked_by_current_user: boolean;
 }
 
 export interface Like {

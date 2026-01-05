@@ -14,6 +14,7 @@ interface CommentThreadProps {
   comments: Comment[];
   currentUser: User;
   onReply: (commentId: string | null, content: string, mediaUrl?: string, mediaType?: 'image' | 'video' | 'gif') => void;
+  onLike: (commentId: string, isLiked: boolean) => void;
   postAuthorHandle?: string;
 }
 
@@ -21,6 +22,7 @@ interface CommentItemProps {
   comment: Comment;
   currentUser: User;
   onReply: (commentId: string | null, content: string, mediaUrl?: string, mediaType?: 'image' | 'video' | 'gif') => void;
+  onLike: (commentId: string, isLiked: boolean) => void;
   depth: number;
   hasMoreReplies: boolean;
   isLastReply?: boolean;
@@ -31,6 +33,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
   comment,
   currentUser,
   onReply,
+  onLike,
   depth,
   hasMoreReplies,
   isLastReply,
@@ -43,6 +46,9 @@ const CommentItem: React.FC<CommentItemProps> = ({
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<'image' | 'video' | 'gif' | undefined>(undefined);
   const [isUploading, setIsUploading] = useState(false);
+  const [isLiked, setIsLiked] = useState(comment.is_liked_by_current_user);
+  const [likesCount, setLikesCount] = useState(comment.likes_count);
+  const [isLiking, setIsLiking] = useState(false);
   const replyTextareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
@@ -158,6 +164,29 @@ const CommentItem: React.FC<CommentItemProps> = ({
 
           {/* Actions */}
           <div className="flex items-center gap-6 mt-3">
+            {/* Like Button */}
+            <button
+              onClick={async () => {
+                if (isLiking) return;
+                setIsLiking(true);
+                try {
+                  onLike(comment.id, isLiked);
+                  setIsLiked(!isLiked);
+                  setLikesCount(prev => isLiked ? prev - 1 : prev + 1);
+                } finally {
+                  setIsLiking(false);
+                }
+              }}
+              disabled={isLiking}
+              className={`group flex items-center gap-1.5 transition-colors ${isLiked ? 'text-pink-500' : 'text-gray-500 hover:text-pink-500'}`}
+            >
+              <div className="p-1.5 rounded-full group-hover:bg-pink-500/10 transition-colors">
+                <Icon icon={isLiked ? 'ph:heart-fill' : 'ph:heart'} width="16" height="16" />
+              </div>
+              {likesCount > 0 && <span className="text-[13px]">{likesCount}</span>}
+            </button>
+
+            {/* Reply Button */}
             <button
               onClick={() => setIsReplying(!isReplying)}
               className="group flex items-center gap-1.5 text-gray-500 hover:text-blue-500 transition-colors"
@@ -309,6 +338,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
               comment={reply}
               currentUser={currentUser}
               onReply={onReply}
+              onLike={onLike}
               depth={depth + 1}
               hasMoreReplies={index < comment.replies!.length - 1}
               isLastReply={index === comment.replies!.length - 1}
@@ -325,6 +355,7 @@ const CommentThread: React.FC<CommentThreadProps> = ({
   comments,
   currentUser,
   onReply,
+  onLike,
   postAuthorHandle
 }) => {
   if (comments.length === 0) {
@@ -339,6 +370,7 @@ const CommentThread: React.FC<CommentThreadProps> = ({
           comment={comment}
           currentUser={currentUser}
           onReply={onReply}
+          onLike={onLike}
           depth={0}
           hasMoreReplies={false}
           replyToHandle={postAuthorHandle}
