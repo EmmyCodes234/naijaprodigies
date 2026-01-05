@@ -4,38 +4,91 @@ import MemberProfileModal, { MemberData } from '../MemberProfileModal';
 import { useMembers } from '../../contexts/MembersContext';
 
 const Members: React.FC = () => {
+
   const [selectedMember, setSelectedMember] = useState<MemberData | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedState, setSelectedState] = useState('');
 
   // Use cached members from context
   const { members } = useMembers();
 
-  const filteredMembers = members.filter(m =>
-  (m?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    m?.state?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    m?.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    m?.rank?.toLowerCase().includes(searchTerm.toLowerCase()))
+  // Extract unique options
+  const categories = React.useMemo(() =>
+    [...new Set(members.map(m => m.category).filter(Boolean))].sort(),
+    [members]
   );
+
+  const states = React.useMemo(() =>
+    [...new Set(members.map(m => m.state).filter(Boolean))].sort(),
+    [members]
+  );
+
+  const filteredMembers = members.filter(m => {
+    const matchesSearch = (
+      m?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      m?.state?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      m?.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      m?.rank?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    const matchesCategory = selectedCategory ? m.category === selectedCategory : true;
+    const matchesState = selectedState ? m.state === selectedState : true;
+
+    return matchesSearch && matchesCategory && matchesState;
+  });
 
   return (
     <div className="bg-[#f2f0e9] min-h-screen pt-24 pb-16">
       <div className="max-w-7xl mx-auto px-6">
 
-        <div className="text-center mb-16">
+        <div className="text-center mb-10">
           <h1 className="font-marker text-6xl text-nsp-teal mb-4">Hall of Fame</h1>
           <p className="text-xl text-gray-600">Meet the grandmasters and prodigies redefining the game.</p>
         </div>
 
-        {/* Search Bar */}
-        <div className="max-w-md mx-auto mb-12 relative">
-          <input
-            type="text"
-            placeholder="Find a player..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-white border-2 border-gray-200 rounded-full py-3 px-6 pl-12 text-nsp-dark-teal focus:outline-none focus:border-nsp-orange transition-colors shadow-sm"
-          />
-          <Icon icon="ph:magnifying-glass-bold" className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" width="20" height="20" />
+        {/* Filters & Search */}
+        <div className="max-w-4xl mx-auto mb-12 flex flex-col md:flex-row gap-4 items-center">
+          {/* Search Bar */}
+          <div className="relative flex-1 w-full">
+            <input
+              type="text"
+              placeholder="Find a player..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-white border-2 border-gray-200 rounded-xl py-3 px-6 pl-12 text-nsp-dark-teal focus:outline-none focus:border-nsp-orange transition-colors shadow-sm"
+            />
+            <Icon icon="ph:magnifying-glass-bold" className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" width="20" height="20" />
+          </div>
+
+          {/* Category Filter */}
+          <div className="relative w-full md:w-48">
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="w-full bg-white border-2 border-gray-200 rounded-xl py-3 px-4 appearance-none text-nsp-dark-teal focus:outline-none focus:border-nsp-orange transition-colors shadow-sm cursor-pointer"
+            >
+              <option value="">All Categories</option>
+              {categories.map((cat, i) => (
+                <option key={i} value={cat as string}>{cat}</option>
+              ))}
+            </select>
+            <Icon icon="ph:caret-down-bold" className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" width="16" height="16" />
+          </div>
+
+          {/* State Filter */}
+          <div className="relative w-full md:w-48">
+            <select
+              value={selectedState}
+              onChange={(e) => setSelectedState(e.target.value)}
+              className="w-full bg-white border-2 border-gray-200 rounded-xl py-3 px-4 appearance-none text-nsp-dark-teal focus:outline-none focus:border-nsp-orange transition-colors shadow-sm cursor-pointer"
+            >
+              <option value="">All States</option>
+              {states.map((st, i) => (
+                <option key={i} value={st as string}>{st}</option>
+              ))}
+            </select>
+            <Icon icon="ph:caret-down-bold" className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" width="16" height="16" />
+          </div>
         </div>
 
         {/* Members Grid */}
