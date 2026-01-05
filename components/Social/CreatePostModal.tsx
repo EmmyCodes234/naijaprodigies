@@ -13,7 +13,7 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClose, curr
     if (!isOpen || !currentUser) return null;
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-start justify-center pt-20 px-4">
+        <div className="fixed inset-0 z-[100] flex items-start justify-center pt-4 md:pt-20 px-4">
             {/* Backdrop */}
             <div
                 className="fixed inset-0 bg-black/40 backdrop-blur-sm"
@@ -21,7 +21,7 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClose, curr
             ></div>
 
             {/* Modal Content */}
-            <div className="relative bg-white w-full max-w-[600px] rounded-2xl shadow-2xl p-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="relative bg-white w-full max-w-[600px] rounded-2xl shadow-2xl p-4 animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
                 <button
                     onClick={onClose}
                     className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 transition-colors"

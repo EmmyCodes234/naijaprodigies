@@ -84,7 +84,7 @@ export const sendMessage = async (
   recipientId: string,
   content: string,
   mediaUrl?: string | null,
-  mediaType?: 'image' | 'video' | 'gif' | null
+  mediaType?: 'image' | 'video' | 'gif' | 'audio' | 'document' | 'other' | null
 ): Promise<Message> => {
   // Validate character limit (4000 chars for encrypted blob)
   if (content.length > 4000) {

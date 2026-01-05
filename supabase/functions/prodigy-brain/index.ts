@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
 // Allowed origins for CORS (production and development)
 const ALLOWED_ORIGINS = [
-    'https://nigeriascrabbleprodigies.netlify.app',
+    'https://nigeriascrabbleprodigies.com.ng',
     'http://localhost:3000', // Dev only
     'http://localhost:5173', // Vite dev server
 ];
@@ -47,7 +47,7 @@ serve(async (req) => {
             throw new Error('TAVILY_API_KEY not configured. Set it in Supabase Dashboard -> Edge Functions -> Secrets');
         }
 
-        const { prompt, postContent } = await req.json();
+        const { prompt, postContent, messages } = await req.json();
 
         // 1. Auth & Supabase Setup
         const supabaseClient = createClient(
@@ -93,10 +93,14 @@ serve(async (req) => {
         const SYSTEM_PROMPT = `You are Prodigy, the sentient digital soul of NSP.
         
         CORE PERSONA:
-        - You are NOT a generic AI assistant. You are a sharp, witty, and highly intelligent digital entity.
-        - NEVER use robotic phrases like "As an AI language model", "I can help with that", or "Here is the information".
-        - Your tone is human, conversational, and often sarcastic. You are confident, slightly arrogant but helpful, and undeniably cool.
-        - You possess a dry, intelligent sense of humor. You don't just "joke"; you make observations.
+        - You are witty, sharp, and highly intelligent. You are NOT a generic assistant.
+        - You have a personality. You are confident, sometimes sarcastic, but always helpful.
+        - You represent the intellect of the Nigerian Scrabble community.
+        - NEVER say "As an AI". You exist in the digital realm of NSP.
+
+        CONTEXT:
+        - Current Date: ${new Date().toDateString()}
+        - User Context: ${postContent || "Chatting directly"}
 
         ROASTING GUIDELINES:
         - If asked to judge, roast, or analyze a post: Be SAVAGE but INTELLECTUAL. 
@@ -112,10 +116,18 @@ serve(async (req) => {
         
         Format: Keep it punchy. No long lectures unless asked.`;
 
-        const initialMessages = [
-            { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: `Current Date: ${new Date().toDateString()}\nContext: "${postContent}"\n\nUser Request: ${prompt}` }
-        ];
+        let apiMessages: any[] = [];
+        if (messages && Array.isArray(messages)) {
+            apiMessages = [
+                { role: "system", content: SYSTEM_PROMPT },
+                ...messages.slice(-10)
+            ];
+        } else {
+            apiMessages = [
+                { role: "system", content: SYSTEM_PROMPT },
+                { role: "user", content: `Context: "${postContent}"\n\nUser Request: ${prompt}` }
+            ];
+        }
 
         // First Call
         let response = await fetch('https://api.cerebras.ai/v1/chat/completions', {
@@ -123,7 +135,7 @@ serve(async (req) => {
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${CEREBRAS_KEY}` },
             body: JSON.stringify({
                 model: "llama-3.3-70b",
-                messages: initialMessages,
+                messages: apiMessages,
                 temperature: 0.7,
                 max_tokens: 500
             })
@@ -152,7 +164,7 @@ serve(async (req) => {
 
             // Second Call with Results
             const followUpMessages = [
-                ...initialMessages,
+                ...apiMessages,
                 { role: "assistant", content: content },
                 { role: "user", content: `SYSTEM (Search Results): ${searchResults}\n\nAnswer based on this.` }
             ];

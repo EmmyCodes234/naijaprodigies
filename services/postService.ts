@@ -127,6 +127,7 @@ export const createPost = async (
   if (imageUrls && imageUrls.length > 0) {
     const imageRecords = imageUrls.map((url, index) => ({
       post_id: postData.id,
+      user_id: userId,
       image_url: url,
       position: index + 1
     }))

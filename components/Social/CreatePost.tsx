@@ -319,7 +319,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ currentUser, onPost }) => {
               e.target.style.height = e.target.value ? `${e.target.scrollHeight}px` : 'auto';
             }}
             placeholder="What is happening?!"
-            className={`w-full bg-white border-none focus:ring-0 text-xl placeholder-gray-500 text-black resize-none overflow-hidden min-h-[48px] ${isOverLimit ? 'text-red-500' : ''
+            className={`w-full bg-white border-none focus:ring-0 text-lg md:text-xl placeholder-gray-500 text-black resize-none overflow-hidden min-h-[48px] ${isOverLimit ? 'text-red-500' : ''
               }`}
             rows={1}
             disabled={isSubmitting}

@@ -6,6 +6,7 @@ import { format, isToday, isYesterday } from 'date-fns';
 import Avatar from '../Shared/Avatar';
 import VerifiedBadge from '../Shared/VerifiedBadge';
 import { uploadImages } from '../../services/imageService';
+import { uploadFile, getFileType } from '../../services/fileService';
 import EmojiPicker, { EmojiClickData, EmojiStyle } from 'emoji-picker-react';
 import GifPicker from '../Shared/GifPicker';
 import { GifResult } from '../../services/gifService';
@@ -115,11 +116,24 @@ const MessageThread: React.FC<MessageThreadProps> = ({
     setSelectedMedia(null);
   };
 
+  /* 
+   * Handle generic file selection
+   * Supports Images, Video, Audio, Docs
+   */
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setSelectedMedia(file);
-      setMediaPreview(URL.createObjectURL(file));
+
+      // Generate preview based on type
+      const type = getFileType(file.type);
+      if (type === 'image') {
+        setMediaPreview(URL.createObjectURL(file));
+      } else {
+        // For non-images, we don't show a visual preview, just an icon or name
+        setMediaPreview(null);
+      }
+
       setSelectedGif(null);
     }
   };
@@ -148,18 +162,19 @@ const MessageThread: React.FC<MessageThreadProps> = ({
       setIsSending(true);
 
       let mediaUrl = selectedGif;
-      let mediaType: 'image' | 'video' | 'gif' | null = selectedGif ? 'gif' : null;
+      let mediaType: 'image' | 'video' | 'gif' | 'audio' | 'document' | 'other' | null = selectedGif ? 'gif' : null;
 
       // Handle file upload if media is selected
       if (selectedMedia) {
         setIsUploading(true);
         try {
-          const uploadedUrls = await uploadImages([selectedMedia], currentUser.id);
-          mediaUrl = uploadedUrls[0];
-          mediaType = selectedMedia.type.startsWith('image') ? 'image' : 'video';
+          // New generic file upload
+          const result = await uploadFile(selectedMedia, 'message-attachments', currentUser.id);
+          mediaUrl = result.url;
+          mediaType = result.type;
         } catch (uploadErr) {
           console.error('Upload failed:', uploadErr);
-          setError('Failed to upload media');
+          setError('Failed to upload file');
           setIsUploading(false);
           setIsSending(false);
           return;
@@ -331,13 +346,41 @@ const MessageThread: React.FC<MessageThreadProps> = ({
                                 className="w-full h-auto object-cover max-h-[300px]"
                                 loading="lazy"
                               />
-                            ) : message.media_type === 'image' || message.media_url.match(/\.(jpeg|jpg|png|webp)$/i) ? (
+                            ) : message.media_type === 'image' || (message.media_url.match(/\.(jpeg|jpg|png|webp)$/i) && message.media_type !== 'audio' && message.media_type !== 'document') ? (
                               <img
                                 src={message.media_url}
                                 alt="Shared media"
                                 className="w-full h-auto object-cover max-h-[300px]"
                                 loading="lazy"
                               />
+                            ) : message.media_type === 'audio' ? (
+                              <div className="min-w-[200px] p-2">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <Icon icon="ph:waveform-bold" className="text-nsp-teal" width="20" />
+                                  <span className="text-xs font-semibold opacity-70">Voice/Audio</span>
+                                </div>
+                                <audio controls className="w-full max-w-[240px] h-[32px]">
+                                  <source src={message.media_url} />
+                                  Your browser does not support audio.
+                                </audio>
+                              </div>
+                            ) : message.media_type === 'document' ? (
+                              <a
+                                href={message.media_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-3 p-3 bg-black/5 hover:bg-black/10 rounded-lg transition-colors group min-w-[200px]"
+                              >
+                                <div className="p-2 bg-white rounded-md shadow-sm">
+                                  <Icon icon="ph:file-pdf-bold" className="text-red-500" width="24" />
+                                </div>
+                                <div className="flex flex-col overflow-hidden">
+                                  <span className="text-sm font-medium truncate max-w-[150px] group-hover:underline">
+                                    Document
+                                  </span>
+                                  <span className="text-[10px] uppercase text-gray-500 font-bold">Download</span>
+                                </div>
+                              </a>
                             ) : null}
                           </div>
                         )}
@@ -366,11 +409,20 @@ const MessageThread: React.FC<MessageThreadProps> = ({
         {mediaPreview && (
           <div className="absolute bottom-full left-4 mb-2 p-2 bg-white rounded-xl shadow-lg border border-gray-100 animate-in fade-in slide-in-from-bottom-2 duration-200">
             <div className="relative">
-              <img
-                src={mediaPreview}
-                alt="Selected media"
-                className="max-h-[120px] rounded-lg object-contain"
-              />
+              <div className="flex items-center justify-center p-4 bg-gray-50 rounded-lg border border-gray-100 min-w-[150px]">
+                {mediaPreview ? (
+                  <img
+                    src={mediaPreview}
+                    alt="Selected media"
+                    className="max-h-[120px] rounded-lg object-contain"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center gap-2 text-gray-500">
+                    <Icon icon="ph:file-arrow-up-bold" width="32" />
+                    <span className="text-xs font-medium max-w-[100px] truncate">{selectedMedia?.name}</span>
+                  </div>
+                )}
+              </div>
               <button
                 onClick={removeMedia}
                 className="absolute -top-2 -right-2 bg-black/75 hover:bg-black/90 text-white rounded-full p-1 shadow-md transition-all"
@@ -420,17 +472,17 @@ const MessageThread: React.FC<MessageThreadProps> = ({
               type="file"
               ref={fileInputRef}
               onChange={handleFileChange}
-              accept="image/*,video/*"
+              accept="*"
               className="hidden"
             />
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               className="p-2 text-nsp-teal hover:bg-nsp-teal/10 rounded-full transition-colors"
-              title="Media"
+              title="Attach File"
               disabled={isSending}
             >
-              <Icon icon="ph:image-bold" width="20" height="20" />
+              <Icon icon="ph:paperclip-bold" width="20" height="20" />
             </button>
             <button
               type="button"

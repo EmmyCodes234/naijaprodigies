@@ -5,7 +5,7 @@ const TAVILY_KEY = Deno.env.get('TAVILY_API_KEY');
 
 // Allowed origins for CORS
 const ALLOWED_ORIGINS = [
-    'https://nigeriascrabbleprodigies.netlify.app',
+    'https://nigeriascrabbleprodigies.com.ng',
     'http://localhost:3000',
     'http://localhost:5173',
 ];

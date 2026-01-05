@@ -105,7 +105,7 @@ export interface Message {
   sender?: User;
   content: string;
   media_url?: string | null;
-  media_type?: 'image' | 'video' | 'gif' | null;
+  media_type?: 'image' | 'video' | 'gif' | 'audio' | 'document' | 'other' | null;
   created_at: string;
   updated_at: string;
   isOptimistic?: boolean;

@@ -44,8 +44,47 @@ export const analyzePost = async (postContent: string, prompt: string): Promise<
     }
 };
 
-export const chatWithProdigy = async (message: string): Promise<AIResponse> => {
-    return analyzePost("User is chatting directly with you.", message);
+
+export interface ChatMessage {
+    role: 'user' | 'assistant' | 'system';
+    content: string;
+}
+
+export const chatWithProdigy = async (messages: ChatMessage[]): Promise<AIResponse> => {
+    try {
+        const { supabase } = await import('./supabaseClient');
+
+        const { data, error } = await supabase.functions.invoke('prodigy-brain', {
+            body: {
+                messages,
+                // Context for other use cases can remain if needed, but for chat, messages is primary
+                postContent: "User is chatting directly with you.",
+                prompt: messages[messages.length - 1].content
+            }
+        });
+
+        if (error) {
+            console.error('Edge Function Error:', error);
+            if (error && (error.status === 429 || error.context?.response?.status === 429)) {
+                return {
+                    content: "🚫 Brain Overload! You've used all your credits for this hour. Please try again later.",
+                    isError: true
+                };
+            }
+            throw error;
+        }
+
+        return {
+            content: data.content,
+            isError: false
+        };
+    } catch (error) {
+        console.error('AI Chat Failed:', error);
+        return {
+            content: "Sorry, I'm having trouble connecting to my brain right now.",
+            isError: true
+        }
+    }
 };
 
 export const postAIComment = async (postId: string, content: string, parentCommentId?: string): Promise<string | null> => {

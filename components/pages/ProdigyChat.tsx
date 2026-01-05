@@ -43,8 +43,20 @@ const ProdigyChat: React.FC = () => {
         setInput('');
         setIsLoading(true);
 
+
         try {
-            const response = await chatWithProdigy(userMsg.content);
+            // Convert current messages to ChatMessage format and append new user message
+            const history = messages.map(m => ({
+                role: m.role as 'user' | 'assistant',
+                content: m.content
+            }));
+
+            const fullHistory = [
+                ...history,
+                { role: 'user' as const, content: userMsg.content }
+            ];
+
+            const response = await chatWithProdigy(fullHistory);
 
             if (response.isError) {
                 addToast('error', response.content);
