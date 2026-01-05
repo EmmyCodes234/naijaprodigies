@@ -11,6 +11,7 @@ import { getAvatarUrl } from '../../utils/userUtils';
 import { useToast } from '../../contexts/ToastContext';
 import { useNavigate } from 'react-router-dom';
 import VerifiedBadge from '../Shared/VerifiedBadge';
+import ExploreSettings from '../Onboarding/ExploreSettings';
 
 type ExploreTab = 'for-you' | 'trending' | 'news' | 'sports' | 'entertainment';
 
@@ -22,6 +23,7 @@ const Explore: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [activeTab, setActiveTab] = useState<ExploreTab>('for-you');
     const [isLoading, setIsLoading] = useState(false);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
     // Data
     const [trendingTopics, setTrendingTopics] = useState<{ tag: string; count: number; category?: string }[]>([]);
@@ -142,6 +144,8 @@ const Explore: React.FC = () => {
 
     return (
         <SocialLayout>
+            <ExploreSettings isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+
             {/* Sticky Header */}
             <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-gray-100">
                 {/* Search Bar */}
@@ -157,7 +161,10 @@ const Explore: React.FC = () => {
                             className="w-full bg-gray-100 border-none rounded-full py-2.5 pl-11 pr-4 focus:ring-2 focus:ring-nsp-teal/50 focus:bg-white transition-all outline-none text-gray-900 placeholder-gray-500 text-[15px]"
                         />
                     </div>
-                    <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                    <button
+                        onClick={() => setIsSettingsOpen(true)}
+                        className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                    >
                         <Icon icon="ph:gear" width="20" height="20" className="text-gray-700" />
                     </button>
                 </div>
