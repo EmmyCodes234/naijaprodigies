@@ -224,10 +224,14 @@ const CreatePost: React.FC<CreatePostProps> = ({ currentUser, onPost }) => {
       }
 
       // 1. Create Poll if active
+      // 1. Create Poll if active
       if (isPollMode) {
-        const expiresAt = new Date();
-        expiresAt.setHours(expiresAt.getHours() + pollDuration);
-        finalPollId = await createPoll(pollQuestion, pollOptions, expiresAt, currentUser.id);
+        // Calculate expiration date
+        const durationHours = pollDuration || 24;
+        const expiresAt = new Date(Date.now() + durationHours * 60 * 60 * 1000);
+
+        // Create poll using the pollService
+        finalPollId = await createPoll(pollQuestion, pollOptions.filter(o => o.trim()), expiresAt, currentUser.id);
       }
 
       // 2. Upload images if any
@@ -387,7 +391,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ currentUser, onPost }) => {
               value={pollQuestion}
               onChange={(e) => setPollQuestion(e.target.value)}
               placeholder="Ask a question..."
-              className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm mb-2 focus:ring-2 focus:ring-nsp-teal focus:border-transparent"
+              className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm mb-2 focus:ring-2 focus:ring-nsp-teal focus:border-transparent text-gray-900"
               disabled={isSubmitting}
             />
             <div className="space-y-2">
@@ -402,7 +406,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ currentUser, onPost }) => {
                       setPollOptions(newOptions);
                     }}
                     placeholder={`Option ${index + 1}`}
-                    className="flex-1 bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-nsp-teal focus:border-transparent"
+                    className="flex-1 bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-nsp-teal focus:border-transparent text-gray-900"
                     disabled={isSubmitting}
                   />
                   {pollOptions.length > 2 && (
@@ -433,7 +437,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ currentUser, onPost }) => {
               <select
                 value={pollDuration}
                 onChange={(e) => setPollDuration(Number(e.target.value))}
-                className="bg-white border border-gray-300 rounded px-2 py-1 text-xs"
+                className="bg-white border border-gray-300 rounded px-2 py-1 text-xs text-gray-900"
                 disabled={isSubmitting}
               >
                 <option value={1}>1 Hour</option>
@@ -470,7 +474,7 @@ const CreatePost: React.FC<CreatePostProps> = ({ currentUser, onPost }) => {
                 value={scheduledDate}
                 onChange={(e) => setScheduledDate(e.target.value)}
                 min={new Date().toISOString().slice(0, 16)}
-                className="w-full bg-white border border-blue-200 rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+                className="w-full bg-white border border-blue-200 rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-400 focus:border-transparent text-gray-900"
               />
             </div>
             <button

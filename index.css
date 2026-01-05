@@ -76,4 +76,16 @@
     transform: translate3d(0, 0, 0);
     will-change: transform, opacity;
   }
+
+  /* Hide Scrollbar but allow scrolling */
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    /* IE and Edge */
+    scrollbar-width: none;
+    /* Firefox */
+  }
 }

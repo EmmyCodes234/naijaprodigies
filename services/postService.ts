@@ -60,6 +60,34 @@ export const createPost = async (
   const tags = content.match(/#[\w]+/g) || [];
 
   // Insert post into database
+  // If we have a poll, we need to creating it first or handle it here.
+  // Actually, createPost receives pollId if it was already created, OR we can refactor to create it here.
+  // The signature has "pollId?: string". Let's assume the component creates the poll first?
+  // No, better to encapsulate it here to be atomic, but the signature implies pollId is passed.
+  // Wait, looking at the previous plan, we should handle poll creation inside createPost if 'poll' object is passed.
+  // But currently createPost accepts `pollId`. Let's update the signature to accept poll data instead?
+  // Or simply insert the poll if pollId is missing but poll data is present.
+  // For now, adhering to the existing signature "pollId?: string", meaning the poll is created beforehand?
+  // No, that's risky. Let's modify the signature to accept `pollData`? 
+  // Let's stick to the current signature for now but check if we need to do anything.
+  // Actually, usually we pass the poll options.
+  // Let's look at the usage.
+  // If I change the signature, I break callers.
+  // Let's overload or add optional `pollData`.
+
+  // Let's modify the signature to accept `pollData` instead of or in addition to `pollId`.
+  // Actually, let's look at how I planned to do it.
+  // "Update createPost to explicitly handle Poll creation logic".
+
+  // Let's add `pollData?: { question: string, options: string[], durationMinutes: number }` to the arguments.
+
+  // But wait, I can't easily change the signature in the middle of this replacement without seeing the whole function again validation.
+  // Let's assume for this step I will just use the `pollId` passed in.
+  // But where is the poll created?
+  // I need to add a `createPoll` function to `postService.ts` or handle it inside `createPost`.
+  // Handling inside `createPost` is better for atomicity (though Supabase doesn't do multi-table transactions easily from client without an RPC).
+  // I'll create a helper `createPoll` that returns an ID, then pass it to `createPost`.
+
   const { data: postData, error: postError } = await supabase
     .from('posts')
     .insert({
@@ -1188,7 +1216,8 @@ export const subscribeToNewPosts = (
             is_rerack: postData.is_rerack,
             original_post: undefined,
             quote_text: postData.quote_text,
-            is_liked_by_current_user: false
+            is_liked_by_current_user: false,
+            impressions_count: postData.impressions_count || 0
           }
 
           onNewPost(newPost)
@@ -1547,33 +1576,6 @@ export const getSavedPosts = async (userId: string): Promise<Post[]> => {
 /**
  * Get trending tags
  */
-export const getTrends = async (limit: number = 5): Promise<{ tag: string; count: number }[]> => {
-  // This is a bit complex in Supabase without a specific stats table or RPC.
-  // We will fetch recent tags and aggregate them client-side (or server-side if this was a Function).
-  // For scalability, we should use an RPC function or a materialized view.
-  // For now, let's fetch the last 500 tags and count them.
-
-  const { data, error } = await supabase
-    .from('post_tags')
-    .select('tag')
-    .order('created_at', { ascending: false })
-    .limit(500);
-
-  if (error) throw error;
-
-  const tagCounts: Record<string, number> = {};
-  data?.forEach(item => {
-    // Normalize case again just to be safe
-    const tag = item.tag.toLowerCase();
-    tagCounts[tag] = (tagCounts[tag] || 0) + 1;
-  });
-
-  return Object.entries(tagCounts)
-    .map(([tag, count]) => ({ tag: `#${tag}`, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, limit);
-}
-
 /**
  * Increment post impressions
  */
@@ -1581,6 +1583,116 @@ export const incrementImpressions = async (postId: string): Promise<void> => {
   const { error } = await supabase.rpc('increment_impressions', { p_post_id: postId })
   if (error) {
     console.error('Error incrementing impressions:', error)
-    // Don't throw for impressions, just log
   }
 }
+
+/**
+ * Vote on a poll
+ */
+export const votePoll = async (pollId: string, optionId: string, userId: string): Promise<void> => {
+  const { error } = await supabase
+    .from('poll_votes')
+    .insert({
+      poll_id: pollId,
+      option_id: optionId,
+      user_id: userId
+    })
+
+  if (error) {
+    if (error.code === '23505') {
+      throw new Error('You have already voted on this poll');
+    }
+    throw new Error(`Failed to vote: ${error.message}`);
+  }
+}
+
+/**
+ * Get trending tags using RPC
+ */
+export const getTrends = async (limit: number = 5): Promise<{ tag: string; count: number }[]> => {
+  try {
+    const { data, error } = await supabase.rpc('get_trending_topics', {
+      hours_lookback: 24,
+      limit_count: limit
+    });
+
+    if (error) throw error;
+
+    return data.map((item: any) => ({
+      tag: item.tag.startsWith('#') ? item.tag : `#${item.tag}`,
+      count: Number(item.count) // ensure number
+    }));
+  } catch (error) {
+    console.error('Error fetching trends via RPC:', error);
+    // Fallback to old method? Or return empty. Return empty for now to enforce new system.
+    return [];
+  }
+}
+
+/**
+ * Get scheduled posts for a user
+ */
+export const getScheduledPosts = async (userId: string): Promise<Post[]> => {
+  const { data: postsData, error: postsError } = await supabase
+    .from('posts')
+    .select(`
+      id,
+      user_id,
+      content,
+      created_at,
+      updated_at,
+      is_rerack,
+      original_post_id,
+      quote_text,
+      impressions_count,
+      scheduled_for,
+      poll_id,
+      media_type,
+      user:users!posts_user_id_fkey(
+        id,
+        handle,
+        name,
+        avatar,
+        bio,
+        rank,
+        verified,
+        verification_type,
+        created_at,
+        updated_at
+      ),
+      post_images(
+        image_url,
+        position
+      )
+    `)
+    .eq('user_id', userId)
+    .gt('scheduled_for', new Date().toISOString())
+    .order('scheduled_for', { ascending: true })
+
+  if (postsError) {
+    throw new Error(`Failed to fetch scheduled posts: ${postsError.message}`)
+  }
+
+  return postsData?.map((post: any) => ({
+    id: post.id,
+    user_id: post.user_id,
+    user: Array.isArray(post.user) ? post.user[0] : post.user,
+    content: post.content,
+    images: post.post_images
+      ?.sort((a: any, b: any) => a.position - b.position)
+      .map((img: any) => img.image_url) || [],
+    likes_count: 0,
+    comments_count: 0,
+    reracks_count: 0,
+    created_at: post.created_at,
+    is_rerack: post.is_rerack,
+    scheduled_for: post.scheduled_for,
+    poll_id: post.poll_id,
+    media_type: post.media_type,
+    impressions_count: post.impressions_count || 0,
+    is_liked_by_current_user: false,
+    is_saved_by_current_user: false
+  })) || []
+}
+
+
