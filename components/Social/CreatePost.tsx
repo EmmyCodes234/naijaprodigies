@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Icon } from '@iconify/react';
 import EmojiPicker, { EmojiClickData, Theme } from 'emoji-picker-react';
 import { User, Post } from '../../types';
@@ -6,11 +6,13 @@ import { createPost } from '../../services/postService';
 import { createPoll } from '../../services/pollService';
 import { uploadImages, generatePreview } from '../../services/imageService';
 import { getTrendingGifs, searchGifs, GifResult } from '../../services/gifService';
+import { searchUsers } from '../../services/userService';
 import { RateLimitError } from '../../utils/rateLimiter';
 import { getAvatarUrl } from '../../utils/userUtils';
 import ImageEditorModal from './ImageEditorModal';
 import GifPicker from '../Shared/GifPicker';
 import Avatar from '../Shared/Avatar';
+import VerifiedBadge from '../Shared/VerifiedBadge';
 
 interface CreatePostProps {
   currentUser: User;
@@ -37,6 +39,13 @@ const CreatePost: React.FC<CreatePostProps> = ({ currentUser, onPost, variant = 
   const [showSchedulePicker, setShowSchedulePicker] = useState(false);
   const [scheduledDate, setScheduledDate] = useState<string>('');
 
+  // Mentions State
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionResults, setMentionResults] = useState<User[]>([]);
+  const [isSearchingMentions, setIsSearchingMentions] = useState(false);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // Poll State
   const [isPollMode, setIsPollMode] = useState(false);
   const [pollQuestion, setPollQuestion] = useState('');
@@ -53,6 +62,13 @@ const CreatePost: React.FC<CreatePostProps> = ({ currentUser, onPost, variant = 
   const charCount = content.length;
   const charLimit = 280;
   const isOverLimit = charCount > charLimit;
+
+  // Cleanup timeout
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    };
+  }, []);
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -187,6 +203,89 @@ const CreatePost: React.FC<CreatePostProps> = ({ currentUser, onPost, variant = 
     setShowGifPicker(false);
     setSelectedImages([]); // Clear other images
     setIsPollMode(false);
+  };
+
+  // Mentions Logic
+  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newContent = e.target.value;
+    setContent(newContent);
+    setError(null);
+    e.target.style.height = 'auto';
+    e.target.style.height = e.target.value ? `${e.target.scrollHeight}px` : 'auto';
+
+    // Mention Detection
+    const cursorPosition = e.target.selectionEnd;
+    const textToCursor = newContent.slice(0, cursorPosition);
+    // Regex: Match @ followed by words, allowing spaces if needed (but usually handles don't have spaces)
+    // We want the LAST occurrence of @word...
+    const match = textToCursor.match(/@([\w.]*)$/);
+
+    if (match) {
+      const query = match[1];
+      setMentionQuery(query);
+      setIsSearchingMentions(true);
+      setMentionIndex(0);
+
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+      searchTimeoutRef.current = setTimeout(async () => {
+        try {
+          const results = await searchUsers(query);
+          setMentionResults(results);
+        } catch (err) {
+          console.error("Mention search error:", err);
+        } finally {
+          setIsSearchingMentions(false);
+        }
+      }, 300);
+    } else {
+      setMentionQuery(null);
+      setMentionResults([]);
+      setIsSearchingMentions(false);
+    }
+  };
+
+  const selectMention = (user: User) => {
+    if (!textareaRef.current || mentionQuery === null) return;
+
+    const cursorPosition = textareaRef.current.selectionEnd;
+    const textToCursor = content.slice(0, cursorPosition);
+    const textAfterCursor = content.slice(cursorPosition);
+
+    // Replace the last @query with @handle
+    const lastAtPos = textToCursor.lastIndexOf('@');
+    const newTextBefore = textToCursor.substring(0, lastAtPos) + `@${user.handle} `;
+
+    const newContent = newTextBefore + textAfterCursor;
+
+    setContent(newContent);
+    setMentionQuery(null);
+    setMentionResults([]);
+
+    // Reset Focus
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.selectionStart = textareaRef.current.selectionEnd = newTextBefore.length;
+      }
+    }, 0);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Mention Navigation
+    if (mentionQuery !== null && mentionResults.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setMentionIndex(prev => (prev + 1) % mentionResults.length);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setMentionIndex(prev => (prev - 1 + mentionResults.length) % mentionResults.length);
+      } else if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        selectMention(mentionResults[mentionIndex]);
+      } else if (e.key === 'Escape') {
+        setMentionQuery(null);
+      }
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -337,21 +436,48 @@ const CreatePost: React.FC<CreatePostProps> = ({ currentUser, onPost, variant = 
         <form onSubmit={handleSubmit} className="flex-1 relative pb-16 sm:pb-0">
           {/* pb-16 to prevent bottom tools overlap on mobile */}
 
-          <div className="border-b border-gray-100 pb-2 border-none">
+          <div className="border-b border-gray-100 pb-2 border-none relative">
             <textarea
               ref={textareaRef}
               value={content}
-              onChange={(e) => {
-                setContent(e.target.value);
-                setError(null); // Clear error on input change
-                e.target.style.height = 'auto';
-                e.target.style.height = e.target.value ? `${e.target.scrollHeight}px` : 'auto';
-              }}
+              onChange={handleContentChange}
+              onKeyDown={handleKeyDown}
               placeholder="What is happening?!"
               className={`w-full bg-transparent border-none focus:ring-0 placeholder-gray-500 text-black resize-none overflow-hidden min-h-[120px] sm:min-h-[48px] ${variant === 'modal' ? 'text-lg' : 'text-xl'} ${isOverLimit ? 'text-red-500' : ''}`}
               rows={1}
               disabled={isSubmitting}
             />
+
+            {/* Mention Popover */}
+            {mentionQuery !== null && (
+              <div className="absolute top-full left-0 z-50 w-64 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden mt-1 max-h-60 overflow-y-auto">
+                {isSearchingMentions && mentionResults.length === 0 ? (
+                  <div className="p-3 text-center text-gray-500 text-sm">Searching...</div>
+                ) : mentionResults.length > 0 ? (
+                  <ul>
+                    {mentionResults.map((user, index) => (
+                      <li
+                        key={user.id}
+                        className={`flex items-center gap-2 p-3 cursor-pointer transition-colors ${index === mentionIndex ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
+                        onClick={() => selectMention(user)}
+                        onMouseEnter={() => setMentionIndex(index)}
+                      >
+                        <Avatar user={user} className="w-8 h-8 rounded-full" />
+                        <div className="flex flex-col overflow-hidden">
+                          <div className="flex items-center gap-1">
+                            <span className="font-bold text-sm truncate">{user.name}</span>
+                            <VerifiedBadge user={user} size={14} />
+                          </div>
+                          <span className="text-gray-500 text-xs truncate">@{user.handle}</span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="p-3 text-center text-gray-500 text-sm">No users found</div>
+                )}
+              </div>
+            )}
 
             {/* Image Previews */}
             {imagePreviews.length > 0 && (

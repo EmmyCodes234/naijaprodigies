@@ -1,7 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Icon } from '@iconify/react';
 import { Conversation, Message, User } from '../../types';
-import { getMessages, sendMessage, markConversationAsRead, subscribeToMessages } from '../../services/messageService';
+import {
+  getMessages,
+  sendMessage,
+  markConversationAsRead,
+  subscribeToMessages,
+  recoverKeys,
+  isKeyUnlocked,
+  hasKeysSetup
+} from '../../services/messageService';
 import { format, isToday, isYesterday } from 'date-fns';
 import Avatar from '../Shared/Avatar';
 import VerifiedBadge from '../Shared/VerifiedBadge';
@@ -40,11 +48,75 @@ const MessageThread: React.FC<MessageThreadProps> = ({
   const [selectedGif, setSelectedGif] = useState<string | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
 
+  // Unlock UI State
+  const [showUnlockModal, setShowUnlockModal] = useState(false);
+  const [pin, setPin] = useState('');
+  const [isUnlocking, setIsUnlocking] = useState(false);
+  const [needsUnlock, setNeedsUnlock] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const otherParticipant = conversation.participants?.find((p: User) => p.id !== currentUser.id) || conversation.participants?.[0] || currentUser;
+
+  // Check if messages need unlocking
+  useEffect(() => {
+    const checkEncryption = async () => {
+      if (messages.length === 0) return;
+
+      // faster check: if any message looks encrypted and keys are locked
+      // Encrypted message format: {"k":"...","iv":"...","c":"..."}
+      const hasEncryptedContent = messages.some(m =>
+        (m.isEncrypted && m.content.startsWith('{')) ||
+        (typeof m.content === 'string' && m.content.startsWith('{"k":'))
+      );
+
+      if (hasEncryptedContent && !isKeyUnlocked()) {
+        const hasSetup = await hasKeysSetup(currentUser.id);
+        if (hasSetup) {
+          setNeedsUnlock(true);
+        } else {
+          // If no keys setup but messages are encrypted, that's weird (maybe from another device).
+          // We can't unlock without keys.
+          setNeedsUnlock(false);
+        }
+      } else {
+        setNeedsUnlock(false);
+      }
+    };
+
+    checkEncryption();
+  }, [messages, currentUser.id]);
+
+  const handleUnlock = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pin.trim()) return;
+
+    setIsUnlocking(true);
+    try {
+      const success = await recoverKeys(currentUser.id, pin);
+      if (success) {
+        setShowUnlockModal(false);
+        setNeedsUnlock(false);
+        setPin('');
+        setError(null);
+
+        // Refresh messages to decrypt them
+        setIsLoadingMessages(true);
+        const fetchedMessages = await getMessages(conversation.id, currentUser.id);
+        setMessages(fetchedMessages);
+        setIsLoadingMessages(false);
+      } else {
+        setError('Incorrect PIN');
+      }
+    } catch (err) {
+      console.error('Unlock failed', err);
+      setError('Failed to unlock messages');
+    } finally {
+      setIsUnlocking(false);
+    }
+  };
 
   // Fetch messages when conversation changes
   useEffect(() => {
@@ -258,7 +330,7 @@ const MessageThread: React.FC<MessageThreadProps> = ({
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full relative">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-md px-4 border-b border-gray-100 min-h-[53px] flex items-center">
         <div className="flex items-center gap-3 w-full">
@@ -290,6 +362,17 @@ const MessageThread: React.FC<MessageThreadProps> = ({
             </div>
           </div>
 
+          {/* Unlock Button (if needed) */}
+          {needsUnlock && (
+            <button
+              onClick={() => setShowUnlockModal(true)}
+              className="px-3 py-1.5 bg-nsp-teal/10 text-nsp-teal text-xs font-bold rounded-full hover:bg-nsp-teal/20 transition-colors flex items-center gap-1.5"
+            >
+              <Icon icon="ph:lock-key-open-bold" />
+              Unlock
+            </button>
+          )}
+
           {/* More options */}
           <button className="p-2 hover:bg-black/5 rounded-full transition-colors">
             <Icon icon="ph:info-bold" width="20" height="20" className="text-gray-900" />
@@ -297,8 +380,64 @@ const MessageThread: React.FC<MessageThreadProps> = ({
         </div>
       </div>
 
+      {/* Unlock Modal */}
+      {showUnlockModal && (
+        <div className="absolute inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl animate-in zoom-in-95 duration-200">
+            <div className="text-center mb-6">
+              <div className="w-12 h-12 bg-nsp-teal/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Icon icon="ph:lock-key-fill" className="text-nsp-teal w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Unlock Messages</h3>
+              <p className="text-sm text-gray-500">
+                Enter your secure PIN to decrypt your conversation history.
+              </p>
+            </div>
+
+            <form onSubmit={handleUnlock}>
+              <div className="mb-4">
+                <input
+                  type="password"
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value)}
+                  placeholder="Enter PIN"
+                  className="w-full px-4 py-3 bg-gray-50 border-2 border-transparent focus:border-nsp-teal focus:bg-white rounded-xl text-center text-lg tracking-widest outline-none transition-all"
+                  autoFocus
+                  maxLength={6}
+                />
+              </div>
+
+              {error && (
+                <p className="text-sm text-red-500 text-center mb-4">{error}</p>
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowUnlockModal(false)}
+                  className="flex-1 py-3 text-gray-600 font-medium hover:bg-gray-50 rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!pin || isUnlocking}
+                  className="flex-1 py-3 bg-gray-900 hover:bg-black text-white font-bold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isUnlocking ? (
+                    <Icon icon="line-md:loading-loop" />
+                  ) : (
+                    "Unlock"
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4">
+      <div className="flex-1 overflow-y-auto px-4 py-4 scroll-smooth">
         {isLoadingMessages ? (
           <div className="flex items-center justify-center h-full">
             <Icon icon="line-md:loading-twotone-loop" width="32" height="32" className="text-nsp-teal" />
@@ -311,10 +450,28 @@ const MessageThread: React.FC<MessageThreadProps> = ({
           </div>
         ) : (
           <div className="space-y-4">
+            {needsUnlock && (
+              <div className="flex justify-center mb-6 sticky top-0 z-0">
+                <button
+                  onClick={() => setShowUnlockModal(true)}
+                  className="bg-gray-900/80 backdrop-blur text-white text-xs px-4 py-2 rounded-full flex items-center gap-2 shadow-sm hover:bg-gray-900 transition-colors"
+                >
+                  <Icon icon="ph:lock-key-fill" />
+                  Messages are end-to-end encrypted. Tap to unlock.
+                </button>
+              </div>
+            )}
+
             {messages.map((message, index) => {
               const isCurrentUser = message.sender_id === currentUser.id;
               const showTimestamp = index === 0 ||
                 (new Date(message.created_at).getTime() - new Date(messages[index - 1].created_at).getTime()) > 300000; // 5 minutes
+
+              // Check if message is still encrypted (raw JSON)
+              const isStillEncrypted = (
+                (message.isEncrypted && message.content.startsWith('{')) ||
+                (typeof message.content === 'string' && message.content.startsWith('{"k":') && message.content.includes('"c":'))
+              );
 
               return (
                 <div key={message.id}>
@@ -337,54 +494,65 @@ const MessageThread: React.FC<MessageThreadProps> = ({
                           }
                           `}
                       >
-                        {message.media_url && (
-                          <div className="mb-2 max-w-full overflow-hidden rounded-lg">
-                            {message.media_type === 'gif' || message.media_url.endsWith('.gif') ? (
-                              <img
-                                src={message.media_url}
-                                alt="GIF"
-                                className="w-full h-auto object-cover max-h-[300px]"
-                                loading="lazy"
-                              />
-                            ) : message.media_type === 'image' || (message.media_url.match(/\.(jpeg|jpg|png|webp)$/i) && message.media_type !== 'audio' && message.media_type !== 'document') ? (
-                              <img
-                                src={message.media_url}
-                                alt="Shared media"
-                                className="w-full h-auto object-cover max-h-[300px]"
-                                loading="lazy"
-                              />
-                            ) : message.media_type === 'audio' ? (
-                              <div className="min-w-[200px] p-2">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <Icon icon="ph:waveform-bold" className="text-nsp-teal" width="20" />
-                                  <span className="text-xs font-semibold opacity-70">Voice/Audio</span>
-                                </div>
-                                <audio controls className="w-full max-w-[240px] h-[32px]">
-                                  <source src={message.media_url} />
-                                  Your browser does not support audio.
-                                </audio>
-                              </div>
-                            ) : message.media_type === 'document' ? (
-                              <a
-                                href={message.media_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-3 p-3 bg-black/5 hover:bg-black/10 rounded-lg transition-colors group min-w-[200px]"
-                              >
-                                <div className="p-2 bg-white rounded-md shadow-sm">
-                                  <Icon icon="ph:file-pdf-bold" className="text-red-500" width="24" />
-                                </div>
-                                <div className="flex flex-col overflow-hidden">
-                                  <span className="text-sm font-medium truncate max-w-[150px] group-hover:underline">
-                                    Document
-                                  </span>
-                                  <span className="text-[10px] uppercase text-gray-500 font-bold">Download</span>
-                                </div>
-                              </a>
-                            ) : null}
+                        {isStillEncrypted ? (
+                          <div className="flex items-center gap-2 py-1 opacity-80 italic">
+                            <Icon icon="ph:lock-key" className="w-4 h-4" />
+                            <span className="text-[13px]">
+                              {isCurrentUser ? "Encrypted message" : "Encrypted message (Unlock to view)"}
+                            </span>
                           </div>
+                        ) : (
+                          <>
+                            {message.media_url && (
+                              <div className="mb-2 max-w-full overflow-hidden rounded-lg">
+                                {message.media_type === 'gif' || message.media_url.endsWith('.gif') ? (
+                                  <img
+                                    src={message.media_url}
+                                    alt="GIF"
+                                    className="w-full h-auto object-cover max-h-[300px]"
+                                    loading="lazy"
+                                  />
+                                ) : message.media_type === 'image' || (message.media_url.match(/\.(jpeg|jpg|png|webp)$/i) && message.media_type !== 'audio' && message.media_type !== 'document') ? (
+                                  <img
+                                    src={message.media_url}
+                                    alt="Shared media"
+                                    className="w-full h-auto object-cover max-h-[300px]"
+                                    loading="lazy"
+                                  />
+                                ) : message.media_type === 'audio' ? (
+                                  <div className="min-w-[200px] p-2">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <Icon icon="ph:waveform-bold" className="text-nsp-teal" width="20" />
+                                      <span className="text-xs font-semibold opacity-70">Voice/Audio</span>
+                                    </div>
+                                    <audio controls className="w-full max-w-[240px] h-[32px]">
+                                      <source src={message.media_url} />
+                                      Your browser does not support audio.
+                                    </audio>
+                                  </div>
+                                ) : message.media_type === 'document' ? (
+                                  <a
+                                    href={message.media_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-3 p-3 bg-black/5 hover:bg-black/10 rounded-lg transition-colors group min-w-[200px]"
+                                  >
+                                    <div className="p-2 bg-white rounded-md shadow-sm">
+                                      <Icon icon="ph:file-pdf-bold" className="text-red-500" width="24" />
+                                    </div>
+                                    <div className="flex flex-col overflow-hidden">
+                                      <span className="text-sm font-medium truncate max-w-[150px] group-hover:underline">
+                                        Document
+                                      </span>
+                                      <span className="text-[10px] uppercase text-gray-500 font-bold">Download</span>
+                                    </div>
+                                  </a>
+                                ) : null}
+                              </div>
+                            )}
+                            <p className="text-[15px] leading-normal whitespace-pre-wrap">{message.content}</p>
+                          </>
                         )}
-                        <p className="text-[15px] leading-normal whitespace-pre-wrap">{message.content}</p>
                       </div>
                     </div>
                   </div>

@@ -205,9 +205,14 @@ export const recoverKeys = async (userId: string, pin: string): Promise<boolean>
     cachedPrivateKey = privateKey;
     return true;
   } catch (e) {
-    console.error('Recovery failed', e);
     return false;
   }
+  return false;
+}
+
+
+export const isKeyUnlocked = (): boolean => {
+  return !!cachedPrivateKey;
 }
 
 
@@ -477,6 +482,31 @@ export const getUnreadMessageCount = async (userId: string): Promise<number> => 
   return totalUnread;
 }
 
+// Return unsubscribe function
+return () => {
+  supabase.removeChannel(channel)
+}
+}
+
+/**
+ * Attempt to decrypt a single message using the cached private key
+ * Useful for real-time updates or re-trying decryption after unlocking keys
+ */
+export const tryDecryptMessage = async (message: Message): Promise<Message> => {
+  if (!cachedPrivateKey) return message;
+
+  try {
+    if (message.content.startsWith('{') && message.content.includes('"k":')) {
+      const decryptedContent = await crypto.decryptMessage(message.content, cachedPrivateKey);
+      return { ...message, content: decryptedContent, isEncrypted: true };
+    }
+  } catch (e) {
+    console.warn('Decryption error for message', message.id, e);
+  }
+
+  return message;
+}
+
 /**
  * Subscribe to real-time message updates for a conversation
  * Returns a subscription object that can be unsubscribed
@@ -529,7 +559,7 @@ export const subscribeToMessages = (
 
           // Transform to Message type
           const sender = Array.isArray(messageData.sender) ? messageData.sender[0] : messageData.sender
-          const newMessage: Message = {
+          let newMessage: Message = {
             id: messageData.id,
             conversation_id: messageData.conversation_id,
             sender_id: messageData.sender_id,
@@ -538,6 +568,9 @@ export const subscribeToMessages = (
             created_at: messageData.created_at,
             updated_at: messageData.updated_at
           }
+
+          // Attempt decryption immediately for realtime messages
+          newMessage = await tryDecryptMessage(newMessage);
 
           onNewMessage(newMessage)
         } catch (error) {
