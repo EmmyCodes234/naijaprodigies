@@ -808,6 +808,7 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onReply,
                 comments={comments}
                 currentUser={currentUser}
                 onReply={handleCommentReply}
+                postAuthorHandle={post.user.handle}
               />
             )}
           </div>

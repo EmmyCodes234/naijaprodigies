@@ -60,6 +60,7 @@ export interface Comment {
   user: User;
   content: string;
   parent_comment_id: string | null;
+  parent_user?: User; // For "Replying to @handle" indicator
   created_at: string;
   replies?: Comment[];
   media_url?: string;

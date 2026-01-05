@@ -2,8 +2,11 @@ import React, { useState, useEffect, useRef } from 'react'
 import { Icon } from '@iconify/react'
 import { useNavigate } from 'react-router-dom'
 import { searchAll } from '../services/searchService'
+import { followUser, unfollowUser, isFollowing } from '../services/followService'
+import { useCurrentUser } from '../hooks/useCurrentUser'
 import type { User, Post } from '../types'
 import VerifiedBadge from './Shared/VerifiedBadge'
+import Avatar from './Shared/Avatar'
 
 interface SearchBarProps {
   className?: string
@@ -14,8 +17,11 @@ const SearchBar: React.FC<SearchBarProps> = ({ className = '' }) => {
   const [results, setResults] = useState<{ users: User[]; posts: Post[] }>({ users: [], posts: [] })
   const [isSearching, setIsSearching] = useState(false)
   const [showResults, setShowResults] = useState(false)
+  const [followingMap, setFollowingMap] = useState<Record<string, boolean>>({})
+  const [loadingFollow, setLoadingFollow] = useState<string | null>(null)
   const searchRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
+  const { profile: currentUser } = useCurrentUser()
 
   // Debounced search
   useEffect(() => {
@@ -31,6 +37,19 @@ const SearchBar: React.FC<SearchBarProps> = ({ className = '' }) => {
         const searchResults = await searchAll(query)
         setResults(searchResults)
         setShowResults(true)
+
+        // Check following status for all returned users
+        if (currentUser && searchResults.users.length > 0) {
+          const followingStatuses: Record<string, boolean> = {}
+          await Promise.all(
+            searchResults.users.map(async (user) => {
+              if (user.id !== currentUser.id) {
+                followingStatuses[user.id] = await isFollowing(currentUser.id, user.id)
+              }
+            })
+          )
+          setFollowingMap(followingStatuses)
+        }
       } catch (error) {
         console.error('Search error:', error)
         setResults({ users: [], posts: [] })
@@ -40,7 +59,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ className = '' }) => {
     }, 300) // 300ms debounce
 
     return () => clearTimeout(timeoutId)
-  }, [query])
+  }, [query, currentUser])
 
   // Close results when clicking outside
   useEffect(() => {
@@ -60,17 +79,30 @@ const SearchBar: React.FC<SearchBarProps> = ({ className = '' }) => {
     setQuery('')
   }
 
+  const handleFollowClick = async (e: React.MouseEvent, userId: string) => {
+    e.stopPropagation()
+    if (!currentUser || loadingFollow) return
+
+    setLoadingFollow(userId)
+    try {
+      const isCurrentlyFollowing = followingMap[userId]
+      if (isCurrentlyFollowing) {
+        await unfollowUser(currentUser.id, userId)
+      } else {
+        await followUser(currentUser.id, userId)
+      }
+      setFollowingMap(prev => ({ ...prev, [userId]: !isCurrentlyFollowing }))
+    } catch (error) {
+      console.error('Follow error:', error)
+    } finally {
+      setLoadingFollow(null)
+    }
+  }
+
   const handlePostClick = (post: Post) => {
-    // For now, navigate to the user's profile
-    // In the future, this could navigate to a specific post view
     navigate(`/profile/${post.user.handle}`)
     setShowResults(false)
     setQuery('')
-  }
-
-  const handleHashtagClick = () => {
-    // Keep the search results open for hashtag searches
-    // User can see all posts with that hashtag
   }
 
   const hasResults = results.users.length > 0 || results.posts.length > 0
@@ -105,7 +137,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ className = '' }) => {
 
       {/* Search Results Dropdown */}
       {showResults && query.trim() && (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-2xl shadow-xl max-h-96 overflow-y-auto z-50">
+        <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-2xl shadow-xl max-h-[70vh] overflow-y-auto z-50">
           {!isSearching && !hasResults && (
             <div className="p-4 text-center text-gray-500">
               No results found for "{query}"
@@ -115,40 +147,54 @@ const SearchBar: React.FC<SearchBarProps> = ({ className = '' }) => {
           {/* Users Section */}
           {results.users.length > 0 && (
             <div className="border-b border-gray-100">
-              <div className="px-4 py-2 text-xs font-bold text-gray-500 uppercase tracking-wide">
-                Users
+              <div className="px-4 py-2 text-xs font-bold text-gray-500 uppercase tracking-wide bg-gray-50/50">
+                People
               </div>
               {results.users.map((user) => (
-                <button
+                <div
                   key={user.id}
+                  className="px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors cursor-pointer"
                   onClick={() => handleUserClick(user)}
-                  className="w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left"
                 >
                   {/* Avatar */}
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-nsp-orange to-nsp-teal flex items-center justify-center text-white font-bold flex-shrink-0 overflow-hidden">
-                    {user.avatar ? (
-                      <img src={user.avatar} alt={user.name || 'User'} className="w-full h-full object-cover" />
-                    ) : (
-                      (user.name || '?').charAt(0).toUpperCase()
-                    )}
-                  </div>
+                  <Avatar user={user} className="w-11 h-11 rounded-full object-cover flex-shrink-0" />
 
                   {/* User Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1">
-                      <span className="font-bold text-gray-900 truncate">{user.name || 'Unknown User'}</span>
+                      <span className="font-bold text-[15px] text-gray-900 truncate">{user.name || 'Unknown User'}</span>
                       <VerifiedBadge user={user} size={16} />
                     </div>
-                    <div className="text-sm text-gray-500 truncate">@{user.handle}</div>
+                    <div className="text-[15px] text-gray-500 truncate">@{user.handle}</div>
+                    {user.bio && (
+                      <div className="text-[13px] text-gray-500 truncate mt-0.5">{user.bio}</div>
+                    )}
                   </div>
 
-                  {/* Rank Badge */}
-                  {user.rank && (
-                    <div className="px-2 py-1 bg-nsp-orange/20 text-nsp-orange text-xs font-bold rounded flex-shrink-0">
-                      {user.rank}
-                    </div>
+                  {/* Follow Button */}
+                  {currentUser && user.id !== currentUser.id && (
+                    <button
+                      onClick={(e) => handleFollowClick(e, user.id)}
+                      disabled={loadingFollow === user.id}
+                      className={`
+                        px-4 py-1.5 rounded-full text-sm font-bold transition-all flex-shrink-0
+                        ${followingMap[user.id]
+                          ? 'bg-white border border-gray-300 text-gray-900 hover:border-red-300 hover:text-red-600 hover:bg-red-50'
+                          : 'bg-gray-900 text-white hover:bg-black'
+                        }
+                        disabled:opacity-50
+                      `}
+                    >
+                      {loadingFollow === user.id ? (
+                        <Icon icon="line-md:loading-loop" width="16" height="16" />
+                      ) : followingMap[user.id] ? (
+                        <span className="group-hover:hidden">Following</span>
+                      ) : (
+                        'Follow'
+                      )}
+                    </button>
                   )}
-                </button>
+                </div>
               ))}
             </div>
           )}
@@ -156,7 +202,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ className = '' }) => {
           {/* Posts Section */}
           {results.posts.length > 0 && (
             <div>
-              <div className="px-4 py-2 text-xs font-bold text-gray-500 uppercase tracking-wide">
+              <div className="px-4 py-2 text-xs font-bold text-gray-500 uppercase tracking-wide bg-gray-50/50">
                 Posts
               </div>
               {results.posts.map((post) => (
@@ -167,13 +213,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ className = '' }) => {
                 >
                   {/* Post Author */}
                   <div className="flex items-center gap-2 mb-2">
-                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-nsp-orange to-nsp-teal flex items-center justify-center text-white text-xs font-bold overflow-hidden">
-                      {post.user?.avatar ? (
-                        <img src={post.user.avatar} alt={post.user.name || 'User'} className="w-full h-full object-cover" />
-                      ) : (
-                        (post.user?.name || '?').charAt(0).toUpperCase()
-                      )}
-                    </div>
+                    <Avatar user={post.user} className="w-6 h-6 rounded-full object-cover" />
                     <span className="font-bold text-gray-900 text-sm">{post.user?.name || 'Unknown User'}</span>
                     <VerifiedBadge user={post.user} size={14} />
                     <span className="text-gray-500 text-sm">@{post.user?.handle}</span>
@@ -200,6 +240,20 @@ const SearchBar: React.FC<SearchBarProps> = ({ className = '' }) => {
                 </button>
               ))}
             </div>
+          )}
+
+          {/* View all results link */}
+          {hasResults && (
+            <button
+              onClick={() => {
+                navigate(`/explore?q=${encodeURIComponent(query)}`)
+                setShowResults(false)
+                setQuery('')
+              }}
+              className="w-full px-4 py-3 text-nsp-teal font-medium hover:bg-nsp-teal/5 transition-colors text-center border-t border-gray-100"
+            >
+              View all results for "{query}"
+            </button>
           )}
         </div>
       )}
