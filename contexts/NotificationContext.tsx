@@ -82,6 +82,23 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         return () => unsubscribe();
     }, [currentUser, addToast]);
 
+    // TV Notifications
+    useEffect(() => {
+        if (!currentUser) return;
+
+        // Dynamic import to avoid circular dependencies if any
+        import('../services/tvService').then(({ subscribeToHighProfileAlerts }) => {
+            const unsubscribe = subscribeToHighProfileAlerts((game) => {
+                addToast(
+                    'success',
+                    `${game.player1_name} vs ${game.player2_name}`,
+                    '🔥 TOP MATCH LIVE NOW'
+                );
+            });
+            return () => unsubscribe();
+        });
+    }, [currentUser, addToast]);
+
     return (
         <NotificationContext.Provider value={{ unreadCount, refreshUnreadCount, markAsReadLocally }}>
             {children}

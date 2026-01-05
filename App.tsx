@@ -12,6 +12,7 @@ import Notifications from './components/pages/Notifications';
 import PostDetail from './components/pages/PostDetail';
 import UserProfile from './components/pages/UserProfile';
 import Messages from './components/pages/Messages';
+import NSPTV from './components/pages/NSPTV';
 import Explore from './components/pages/Explore';
 import Bookmarks from './components/pages/Bookmarks';
 import Settings from './components/pages/Settings';
@@ -69,7 +70,7 @@ const AppContent: React.FC = () => {
   }, []);
 
   // Determine if footer should be shown
-  const shouldShowFooter = !['/feed', '/messages', '/post', '/profile', '/notifications', '/explore', '/bookmarks', '/settings', '/prodigy'].some(path => location.pathname.startsWith(path));
+  const shouldShowFooter = !['/feed', '/messages', '/post', '/profile', '/notifications', '/explore', '/bookmarks', '/settings', '/prodigy', '/tv'].some(path => location.pathname.startsWith(path));
 
   return (
     <div className="bg-[#052120] min-h-screen text-white font-sans selection:bg-nsp-orange selection:text-white flex flex-col">
@@ -162,6 +163,11 @@ const AppContent: React.FC = () => {
           <Route path="/:userId" element={
             <ProtectedRoute>
               <UserProfile />
+            </ProtectedRoute>
+          } />
+          <Route path="/tv" element={
+            <ProtectedRoute>
+              <NSPTV />
             </ProtectedRoute>
           } />
         </Routes>

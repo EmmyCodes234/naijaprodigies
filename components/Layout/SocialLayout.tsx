@@ -215,6 +215,7 @@ const SocialLayout: React.FC<SocialLayoutProps> = ({ children, showWidgets = tru
         { icon: 'ph:bell', activeIcon: 'ph:bell-fill', label: 'Notifications', path: '/notifications' },
         { icon: 'ph:envelope', activeIcon: 'ph:envelope-fill', label: 'Messages', path: '/messages' },
         { icon: 'ph:microphone-stage', activeIcon: 'ph:microphone-stage-fill', label: 'Gist', path: '#' },
+        { icon: 'ph:television-simple', activeIcon: 'ph:television-simple-fill', label: 'TV', path: '/tv' },
         { icon: 'ph:bookmark-simple', activeIcon: 'ph:bookmark-simple-fill', label: 'Bookmarks', path: '/bookmarks' },
         { icon: 'ph:user', activeIcon: 'ph:user-fill', label: 'Profile', path: currentUser ? `/profile/${currentUser.id}` : '#' },
         { icon: 'ph:dots-three-circle', activeIcon: 'ph:dots-three-circle-fill', label: 'More', path: '#' },
