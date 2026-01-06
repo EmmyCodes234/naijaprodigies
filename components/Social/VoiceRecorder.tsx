@@ -11,7 +11,7 @@ interface VoiceRecorderProps {
 const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     onRecordingComplete,
     onCancel,
-    maxDurationMs = 15000,
+    maxDurationMs = 300000,
     autoStart = false
 }) => {
     const [isRecording, setIsRecording] = useState(false);

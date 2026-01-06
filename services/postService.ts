@@ -33,7 +33,9 @@ export const createPost = async (
   imageUrls?: string[],
   scheduledFor?: Date,
   pollId?: string,
-  mediaType: 'image' | 'video' | 'gif' = 'image'
+  mediaType: 'image' | 'video' | 'gif' = 'image',
+  audioUrl?: string,
+  audioDuration?: number
 ): Promise<Post> => {
   // Check rate limit
   if (!rateLimiter.checkLimit(userId, 'post_creation')) {
@@ -48,143 +50,211 @@ export const createPost = async (
 
   // Validate character limit (280 chars)
   if (content.length > 280) {
-    throw new Error('Post content exceeds 280 character limit')
+    throw new Error('Post exceeds 280 characters')
   }
 
-  // Validate content is not empty (unless it has media or poll)
-  if (!content.trim() && !imageUrls?.length && !pollId) {
-    throw new Error('Post must contain text, media, or a poll')
-  }
-
-  // Extract tags
-  const tags = content.match(/#[\w]+/g) || [];
-
-  // Insert post into database
-  // If we have a poll, we need to creating it first or handle it here.
-  // Actually, createPost receives pollId if it was already created, OR we can refactor to create it here.
-  // The signature has "pollId?: string". Let's assume the component creates the poll first?
-  // No, better to encapsulate it here to be atomic, but the signature implies pollId is passed.
-  // Wait, looking at the previous plan, we should handle poll creation inside createPost if 'poll' object is passed.
-  // But currently createPost accepts `pollId`. Let's update the signature to accept poll data instead?
-  // Or simply insert the poll if pollId is missing but poll data is present.
-  // For now, adhering to the existing signature "pollId?: string", meaning the poll is created beforehand?
-  // No, that's risky. Let's modify the signature to accept `pollData`? 
-  // Let's stick to the current signature for now but check if we need to do anything.
-  // Actually, usually we pass the poll options.
-  // Let's look at the usage.
-  // If I change the signature, I break callers.
-  // Let's overload or add optional `pollData`.
-
-  // Let's modify the signature to accept `pollData` instead of or in addition to `pollId`.
-  // Actually, let's look at how I planned to do it.
-  // "Update createPost to explicitly handle Poll creation logic".
-
-  // Let's add `pollData?: { question: string, options: string[], durationMinutes: number }` to the arguments.
-
-  // But wait, I can't easily change the signature in the middle of this replacement without seeing the whole function again validation.
-  // Let's assume for this step I will just use the `pollId` passed in.
-  // But where is the poll created?
-  // I need to add a `createPoll` function to `postService.ts` or handle it inside `createPost`.
-  // Handling inside `createPost` is better for atomicity (though Supabase doesn't do multi-table transactions easily from client without an RPC).
-  // I'll create a helper `createPoll` that returns an ID, then pass it to `createPost`.
-
-  const { data: postData, error: postError } = await supabase
+  const { data, error } = await supabase
     .from('posts')
-    .insert({
-      user_id: userId,
-      content: content.trim(),
-      is_rerack: false,
-      scheduled_for: scheduledFor ? scheduledFor.toISOString() : null,
-      poll_id: pollId || null,
-      media_type: mediaType,
-      impressions_count: 0
-    })
-    .select()
+    .insert([
+      {
+        user_id: userId,
+        content,
+        image_urls: imageUrls,
+        scheduled_for: scheduledFor,
+        poll_id: pollId,
+        media_type: mediaType,
+        audio_url: audioUrl,
+        audio_duration_ms: audioDuration
+      }
+    ])
+    .select(
+      `
+      *,
+      user:users (
+        id,
+        username,
+        display_name,
+        avatar_url,
+        is_verified,
+        role
+      ),
+      poll:polls (
+        *,
+        options:poll_options (*)
+      )
+    `
+    )
     .single()
 
-  if (postError) {
-    throw new Error(`Failed to create post: ${postError.message}`)
+  if (error) {
+    console.error('Error creating post:', error)
+    throw error
   }
 
-  // Insert tags if any
-  if (tags.length > 0) {
-    const tagRecords = tags.map(tag => ({
-      post_id: postData.id,
-      tag: tag.substring(1).toLowerCase(), // Remove # and normalize
-    }));
+  return data
+}
 
-    const { error: tagError } = await supabase
-      .from('post_tags')
-      .insert(tagRecords);
+/**
+ * Upload a voice note to storage
+ */
+export const uploadVoiceNote = async (userId: string, blob: Blob): Promise<string> => {
+  // Create a unique filename: timestamp_random.webm
+  const filename = `${Date.now()}_${Math.random().toString(36).substring(7)}.webm`;
+  const filePath = `${userId}/${filename}`;
 
-    if (tagError) {
-      console.error('Failed to insert tags:', tagError);
-      // Don't fail the post creation for this, just log it
-    }
+  const { data, error } = await supabase.storage
+    .from('voice-notes')
+    .upload(filePath, blob, {
+      contentType: blob.type || 'audio/webm',
+      upsert: true
+    });
+
+  if (error) {
+    console.error('Error uploading voice note:', error);
+    throw error;
   }
 
-  // Insert images if provided
-  if (imageUrls && imageUrls.length > 0) {
-    const imageRecords = imageUrls.map((url, index) => ({
-      post_id: postData.id,
-      user_id: userId,
-      image_url: url,
-      position: index + 1
-    }))
+  // Get public URL
+  const { data: { publicUrl } } = supabase.storage
+    .from('voice-notes')
+    .getPublicUrl(filePath);
 
-    const { error: imageError } = await supabase
-      .from('post_images')
-      .insert(imageRecords)
+  return publicUrl;
+}
+// Validate content is not empty (unless it has media or poll)
+if (!content.trim() && !imageUrls?.length && !pollId) {
+  throw new Error('Post must contain text, media, or a poll')
+}
 
-    if (imageError) {
-      // Rollback: delete the post if image insertion fails
-      await supabase.from('posts').delete().eq('id', postData.id)
-      throw new Error(`Failed to attach images: ${imageError.message}`)
-    }
-  }
+// Extract tags
+const tags = content.match(/#[\w]+/g) || [];
 
-  // Fetch the user data
-  const { data: userData, error: userError } = await supabase
-    .from('users')
-    .select('*')
-    .eq('id', userId)
-    .single()
+// Insert post into database
+// If we have a poll, we need to creating it first or handle it here.
+// Actually, createPost receives pollId if it was already created, OR we can refactor to create it here.
+// The signature has "pollId?: string". Let's assume the component creates the poll first?
+// No, better to encapsulate it here to be atomic, but the signature implies pollId is passed.
+// Wait, looking at the previous plan, we should handle poll creation inside createPost if 'poll' object is passed.
+// But currently createPost accepts `pollId`. Let's update the signature to accept poll data instead?
+// Or simply insert the poll if pollId is missing but poll data is present.
+// For now, adhering to the existing signature "pollId?: string", meaning the poll is created beforehand?
+// No, that's risky. Let's modify the signature to accept `pollData`? 
+// Let's stick to the current signature for now but check if we need to do anything.
+// Actually, usually we pass the poll options.
+// Let's look at the usage.
+// If I change the signature, I break callers.
+// Let's overload or add optional `pollData`.
 
-  if (userError) {
-    throw new Error(`Failed to fetch user data: ${userError.message}`)
-  }
+// Let's modify the signature to accept `pollData` instead of or in addition to `pollId`.
+// Actually, let's look at how I planned to do it.
+// "Update createPost to explicitly handle Poll creation logic".
 
-  // Fetch images for the post
-  const { data: imagesData } = await supabase
-    .from('post_images')
-    .select('image_url')
-    .eq('post_id', postData.id)
-    .order('position', { ascending: true })
+// Let's add `pollData?: { question: string, options: string[], durationMinutes: number }` to the arguments.
 
-  const images = imagesData?.map(img => img.image_url) || []
+// But wait, I can't easily change the signature in the middle of this replacement without seeing the whole function again validation.
+// Let's assume for this step I will just use the `pollId` passed in.
+// But where is the poll created?
+// I need to add a `createPoll` function to `postService.ts` or handle it inside `createPost`.
+// Handling inside `createPost` is better for atomicity (though Supabase doesn't do multi-table transactions easily from client without an RPC).
+// I'll create a helper `createPoll` that returns an ID, then pass it to `createPost`.
 
-  // Record successful action for rate limiting
-  rateLimiter.recordAction(userId, 'post_creation')
-
-  // Return the complete post object
-  return {
-    id: postData.id,
-    user_id: postData.user_id,
-    user: userData,
-    content: postData.content,
-    images: images,
-    likes_count: 0,
-    comments_count: 0,
-    reracks_count: 0,
-    created_at: postData.created_at,
-    is_rerack: postData.is_rerack,
-    original_post: undefined,
-    is_liked_by_current_user: false,
-    scheduled_for: postData.scheduled_for,
-    poll_id: postData.poll_id,
-    media_type: postData.media_type,
+const { data: postData, error: postError } = await supabase
+  .from('posts')
+  .insert({
+    user_id: userId,
+    content: content.trim(),
+    is_rerack: false,
+    scheduled_for: scheduledFor ? scheduledFor.toISOString() : null,
+    poll_id: pollId || null,
+    media_type: mediaType,
     impressions_count: 0
+  })
+  .select()
+  .single()
+
+if (postError) {
+  throw new Error(`Failed to create post: ${postError.message}`)
+}
+
+// Insert tags if any
+if (tags.length > 0) {
+  const tagRecords = tags.map(tag => ({
+    post_id: postData.id,
+    tag: tag.substring(1).toLowerCase(), // Remove # and normalize
+  }));
+
+  const { error: tagError } = await supabase
+    .from('post_tags')
+    .insert(tagRecords);
+
+  if (tagError) {
+    console.error('Failed to insert tags:', tagError);
+    // Don't fail the post creation for this, just log it
   }
+}
+
+// Insert images if provided
+if (imageUrls && imageUrls.length > 0) {
+  const imageRecords = imageUrls.map((url, index) => ({
+    post_id: postData.id,
+    user_id: userId,
+    image_url: url,
+    position: index + 1
+  }))
+
+  const { error: imageError } = await supabase
+    .from('post_images')
+    .insert(imageRecords)
+
+  if (imageError) {
+    // Rollback: delete the post if image insertion fails
+    await supabase.from('posts').delete().eq('id', postData.id)
+    throw new Error(`Failed to attach images: ${imageError.message}`)
+  }
+}
+
+// Fetch the user data
+const { data: userData, error: userError } = await supabase
+  .from('users')
+  .select('*')
+  .eq('id', userId)
+  .single()
+
+if (userError) {
+  throw new Error(`Failed to fetch user data: ${userError.message}`)
+}
+
+// Fetch images for the post
+const { data: imagesData } = await supabase
+  .from('post_images')
+  .select('image_url')
+  .eq('post_id', postData.id)
+  .order('position', { ascending: true })
+
+const images = imagesData?.map(img => img.image_url) || []
+
+// Record successful action for rate limiting
+rateLimiter.recordAction(userId, 'post_creation')
+
+// Return the complete post object
+return {
+  id: postData.id,
+  user_id: postData.user_id,
+  user: userData,
+  content: postData.content,
+  images: images,
+  likes_count: 0,
+  comments_count: 0,
+  reracks_count: 0,
+  created_at: postData.created_at,
+  is_rerack: postData.is_rerack,
+  original_post: undefined,
+  is_liked_by_current_user: false,
+  scheduled_for: postData.scheduled_for,
+  poll_id: postData.poll_id,
+  media_type: postData.media_type,
+  impressions_count: 0
+}
 }
 
 

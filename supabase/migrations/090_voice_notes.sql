@@ -16,7 +16,7 @@ ALTER TABLE posts ADD COLUMN IF NOT EXISTS audio_transcript TEXT;
 CREATE POLICY "Users can upload voice notes"
 ON storage.objects FOR INSERT
 TO authenticated
-WITH CHECK (bucket_id = 'voice-notes' AND auth.uid()::text = (storage.foldername(name))[1]);
+WITH CHECK (bucket_id = 'voice-notes' AND auth.role() = 'authenticated');
 
 -- Allow anyone to view voice notes (public)
 CREATE POLICY "Voice notes are publicly accessible"

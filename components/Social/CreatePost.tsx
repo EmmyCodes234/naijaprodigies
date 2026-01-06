@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Icon } from '@iconify/react';
 import EmojiPicker, { EmojiClickData, Theme } from 'emoji-picker-react';
 import { User, Post } from '../../types';
-import { createPost, createPostWithAudio } from '../../services/postService';
+import { createPost, uploadVoiceNote } from '../../services/postService';
 import { createPoll } from '../../services/pollService';
 import { uploadImages, generatePreview } from '../../services/imageService';
 import { getTrendingGifs, searchGifs, GifResult } from '../../services/gifService';
@@ -292,6 +292,24 @@ const CreatePost: React.FC<CreatePostProps> = ({ currentUser, onPost, variant = 
         setMentionQuery(null);
       }
     }
+  };
+
+  // Helper to upload audio and create post
+  const createPostWithAudio = async (userId: string, content: string, blob: Blob, durationMs: number) => {
+    // 1. Upload audio
+    const audioUrl = await uploadVoiceNote(userId, blob);
+
+    // 2. Create post record
+    return await createPost(
+      userId,
+      content,
+      [], // no images
+      undefined, // scheduledFor
+      undefined, // pollId
+      'video', // Treat voice note as 'video' media type internally
+      audioUrl,
+      durationMs
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -680,7 +698,6 @@ const CreatePost: React.FC<CreatePostProps> = ({ currentUser, onPost, variant = 
                   setAudioBlob(null);
                   setAudioDurationMs(0);
                 }}
-                maxDurationMs={15000}
               />
             </div>
           )}
