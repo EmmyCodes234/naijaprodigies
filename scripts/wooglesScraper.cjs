@@ -13,6 +13,14 @@
 
 const puppeteer = require('puppeteer');
 const { createClient } = require('@supabase/supabase-js');
+const path = require('path');
+const dotenv = require('dotenv');
+
+// Load .env first
+dotenv.config({ path: path.join(__dirname, '../.env') });
+// Override with .env.local
+dotenv.config({ path: path.join(__dirname, '../.env.local') });
+
 
 // Configuration
 const WOOGLES_URL = 'https://woogles.io';
@@ -27,15 +35,15 @@ const HIGH_PROFILE_THRESHOLD = 4000;
 const isDryRun = process.argv.includes('--dry-run');
 
 // Initialize Supabase client
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 
-if (!isDryRun && (!supabaseUrl || !supabaseServiceKey)) {
+if (!isDryRun && (!SUPABASE_URL || !SUPABASE_SERVICE_KEY)) {
     console.error('Missing required environment variables: SUPABASE_URL, SUPABASE_SERVICE_KEY (or use --dry-run)');
     process.exit(1);
 }
 
-const supabase = isDryRun ? null : createClient(supabaseUrl, supabaseServiceKey);
+const supabase = isDryRun ? null : createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
 /**
  * Parse rating from text like "1850" or handle empty/missing

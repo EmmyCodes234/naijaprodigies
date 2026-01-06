@@ -12,7 +12,13 @@ import Notifications from './components/pages/Notifications';
 import PostDetail from './components/pages/PostDetail';
 import UserProfile from './components/pages/UserProfile';
 import Messages from './components/pages/Messages';
-import NSPTV from './components/pages/NSPTV';
+// DISABLED: TV, Director, Tournaments features
+// import NSPTV from './components/pages/NSPTV';
+// import TournamentDirector from './components/pages/TournamentDirector';
+// import TournamentHub from './components/pages/TournamentHub';
+// import ArenaBrowser from './components/pages/ArenaBrowser';
+// import ArenaDirector from './components/pages/ArenaDirector';
+// import ArenaLobby from './components/pages/ArenaLobby';
 import Explore from './components/pages/Explore';
 import Bookmarks from './components/pages/Bookmarks';
 import Settings from './components/pages/Settings';
@@ -34,8 +40,6 @@ import GistRoom from './components/Gist/GistRoom';
 import GistJoinHandler from './components/Gist/GistJoinHandler';
 import { MembersProvider } from './contexts/MembersContext';
 import ProdigyChat from './components/pages/ProdigyChat';
-
-// Smart Scroll Restoration - preserves scroll on back/forward navigation
 const ScrollRestoration = () => {
   const { pathname } = useLocation();
 
@@ -70,7 +74,7 @@ const AppContent: React.FC = () => {
   }, []);
 
   // Determine if footer should be shown
-  const shouldShowFooter = !['/feed', '/messages', '/post', '/profile', '/notifications', '/explore', '/bookmarks', '/settings', '/prodigy', '/tv'].some(path => location.pathname.startsWith(path));
+  const shouldShowFooter = !['/feed', '/messages', '/post', '/profile', '/notifications', '/explore', '/bookmarks', '/settings', '/prodigy'].some(path => location.pathname.startsWith(path));
 
   return (
     <div className="bg-[#052120] min-h-screen text-white font-sans selection:bg-nsp-orange selection:text-white flex flex-col">
@@ -165,11 +169,38 @@ const AppContent: React.FC = () => {
               <UserProfile />
             </ProtectedRoute>
           } />
+          {/* DISABLED: TV, Director, Tournaments features
           <Route path="/tv" element={
             <ProtectedRoute>
               <NSPTV />
             </ProtectedRoute>
           } />
+          <Route path="/director" element={
+            <ProtectedRoute>
+              <TournamentDirector />
+            </ProtectedRoute>
+          } />
+          <Route path="/tournament/:tournamentId" element={
+            <ProtectedRoute>
+              <TournamentHub />
+            </ProtectedRoute>
+          } />
+          <Route path="/tournaments" element={
+            <ProtectedRoute>
+              <ArenaBrowser />
+            </ProtectedRoute>
+          } />
+          <Route path="/arena" element={
+            <ProtectedRoute>
+              <ArenaLobby />
+            </ProtectedRoute>
+          } />
+          <Route path="/director/:id" element={
+            <ProtectedRoute>
+              <ArenaDirector />
+            </ProtectedRoute>
+          } />
+          */}
         </Routes>
       </main>
 

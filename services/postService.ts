@@ -1746,3 +1746,150 @@ export const getScheduledPosts = async (userId: string): Promise<Post[]> => {
 }
 
 
+// ============================================
+// VOICE NOTES
+// ============================================
+
+/**
+ * Upload a voice note to Supabase Storage
+ * Returns the public URL of the uploaded file
+ */
+export const uploadVoiceNote = async (
+  userId: string,
+  audioBlob: Blob,
+  durationMs: number
+): Promise<{ url: string; durationMs: number }> => {
+  // Validate max duration (15 seconds)
+  if (durationMs > 15000) {
+    throw new Error('Voice note exceeds 15 second limit')
+  }
+
+  // Generate unique filename
+  const timestamp = Date.now()
+  const extension = audioBlob.type.includes('webm') ? 'webm' : 'mp4'
+  const filename = `${userId}/${timestamp}.${extension}`
+
+  // Upload to Supabase Storage
+  const { error: uploadError } = await supabase.storage
+    .from('voice-notes')
+    .upload(filename, audioBlob, {
+      contentType: audioBlob.type,
+      cacheControl: '3600'
+    })
+
+  if (uploadError) {
+    throw new Error(`Failed to upload voice note: ${uploadError.message}`)
+  }
+
+  // Get public URL
+  const { data: urlData } = supabase.storage
+    .from('voice-notes')
+    .getPublicUrl(filename)
+
+  return {
+    url: urlData.publicUrl,
+    durationMs
+  }
+}
+
+/**
+ * Create a post with a voice note attached
+ */
+export const createPostWithAudio = async (
+  userId: string,
+  content: string,
+  audioBlob: Blob,
+  audioDurationMs: number
+): Promise<Post> => {
+  // Check rate limit
+  if (!rateLimiter.checkLimit(userId, 'post_creation')) {
+    const timeUntilReset = rateLimiter.getTimeUntilReset(userId, 'post_creation')
+    const formattedTime = formatTimeUntilReset(timeUntilReset)
+    throw new RateLimitError(
+      `Rate limit exceeded. You can create more posts in ${formattedTime}. Limit: 10 posts per hour.`,
+      'post_creation',
+      timeUntilReset
+    )
+  }
+
+  // Upload the voice note first
+  const { url: audioUrl, durationMs } = await uploadVoiceNote(userId, audioBlob, audioDurationMs)
+
+  // Insert post into database with audio fields
+  const { data: postData, error: postError } = await supabase
+    .from('posts')
+    .insert({
+      user_id: userId,
+      content: content.trim(),
+      is_rerack: false,
+      audio_url: audioUrl,
+      audio_duration_ms: durationMs,
+      media_type: 'audio' as any,
+      impressions_count: 0
+    })
+    .select()
+    .single()
+
+  if (postError) {
+    throw new Error(`Failed to create post: ${postError.message}`)
+  }
+
+  // Extract and insert tags
+  const tags = content.match(/#[\w]+/g) || []
+  if (tags.length > 0) {
+    const tagRecords = tags.map(tag => ({
+      post_id: postData.id,
+      tag: tag.substring(1).toLowerCase()
+    }))
+
+    await supabase.from('post_tags').insert(tagRecords)
+  }
+
+  // Fetch user data
+  const { data: userData, error: userError } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', userId)
+    .single()
+
+  if (userError) {
+    throw new Error(`Failed to fetch user data: ${userError.message}`)
+  }
+
+  // Record successful action for rate limiting
+  rateLimiter.recordAction(userId, 'post_creation')
+
+  return {
+    id: postData.id,
+    user_id: postData.user_id,
+    user: userData,
+    content: postData.content,
+    images: [],
+    likes_count: 0,
+    comments_count: 0,
+    reracks_count: 0,
+    created_at: postData.created_at,
+    is_rerack: false,
+    is_liked_by_current_user: false,
+    audio_url: postData.audio_url,
+    audio_duration_ms: postData.audio_duration_ms,
+    impressions_count: 0
+  }
+}
+
+/**
+ * Delete a voice note from storage
+ */
+export const deleteVoiceNote = async (userId: string, audioUrl: string): Promise<void> => {
+  // Extract filename from URL
+  const urlParts = audioUrl.split('/')
+  const filename = `${userId}/${urlParts[urlParts.length - 1]}`
+
+  const { error } = await supabase.storage
+    .from('voice-notes')
+    .remove([filename])
+
+  if (error) {
+    console.error('Failed to delete voice note:', error)
+  }
+}

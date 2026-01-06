@@ -64,15 +64,17 @@ const Explore: React.FC = () => {
     useEffect(() => {
         const loadNews = async () => {
             try {
-                const topics = activeTab === 'sports'
-                    ? ['sports', 'football', 'AFCON']
-                    : activeTab === 'entertainment'
-                        ? ['entertainment', 'music', 'movies']
-                        : activeTab === 'news'
-                            ? ['Nigeria', 'Africa', 'breaking news']
-                            : ['Scrabble', 'Nigeria', 'word games'];
+                // Map tabs to RSS categories
+                const categoryMap: Record<ExploreTab, string> = {
+                    'for-you': 'general',
+                    'news': 'general',
+                    'sports': 'sports',
+                    'entertainment': 'entertainment',
+                    'trending': 'general'
+                };
 
-                const news = await fetchNews(topics, 5);
+                const category = categoryMap[activeTab] || 'general';
+                const news = await fetchNews([category], 5);
                 setNewsArticles(news);
             } catch (error) {
                 console.error('Failed to load news:', error);

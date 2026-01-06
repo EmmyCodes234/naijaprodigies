@@ -8,7 +8,7 @@ interface LiveGameCardProps {
     onWatch: (game: LiveGame) => void;
 }
 
-const LiveGameCard: React.FC<LiveGameCardProps> = ({ game, onWatch }) => {
+const LiveGameCard = React.forwardRef<HTMLDivElement, LiveGameCardProps>(({ game, onWatch }, ref) => {
     const getInitials = (name: string) => name.slice(0, 2).toUpperCase();
 
     // Color logic for ratings (lighter/pastel versions for light mode if needed, or stick to standard)
@@ -103,6 +103,6 @@ const LiveGameCard: React.FC<LiveGameCardProps> = ({ game, onWatch }) => {
 
         </motion.div>
     );
-};
+});
 
 export default LiveGameCard;

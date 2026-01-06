@@ -48,9 +48,13 @@ export interface Post {
   is_liked_by_current_user?: boolean;
   scheduled_for?: string | null;
   poll_id?: string | null;
-  media_type?: 'image' | 'video' | 'gif';
+  media_type?: 'image' | 'video' | 'gif' | 'audio';
   is_saved_by_current_user?: boolean;
   impressions_count: number;
+  // Voice notes
+  audio_url?: string | null;
+  audio_duration_ms?: number | null;
+  audio_transcript?: string | null;
 }
 
 export interface Comment {

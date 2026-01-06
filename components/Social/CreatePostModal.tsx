@@ -23,16 +23,7 @@ const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClose, curr
             {/* Modal Content - Full screen on mobile, Modal on Desktop */}
             <div className="relative bg-white w-full h-full sm:h-auto sm:max-w-[600px] sm:rounded-2xl shadow-2xl animate-in fade-in slide-in-from-bottom-10 sm:zoom-in-95 duration-200 overflow-hidden flex flex-col">
 
-                {/* Mobile Header (Hidden on Desktop usually, but X keeps it consistent inside) */}
-                <div className="sm:hidden flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                    <button
-                        onClick={onClose}
-                        className="text-base font-medium text-gray-900"
-                    >
-                        Cancel
-                    </button>
-                    {/* Post button is inside the CreatePost component */}
-                </div>
+
 
                 {/* Close Button (Desktop Only) */}
                 <button

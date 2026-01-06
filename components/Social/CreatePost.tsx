@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Icon } from '@iconify/react';
 import EmojiPicker, { EmojiClickData, Theme } from 'emoji-picker-react';
 import { User, Post } from '../../types';
-import { createPost } from '../../services/postService';
+import { createPost, createPostWithAudio } from '../../services/postService';
 import { createPoll } from '../../services/pollService';
 import { uploadImages, generatePreview } from '../../services/imageService';
 import { getTrendingGifs, searchGifs, GifResult } from '../../services/gifService';
@@ -13,6 +13,7 @@ import ImageEditorModal from './ImageEditorModal';
 import GifPicker from '../Shared/GifPicker';
 import Avatar from '../Shared/Avatar';
 import VerifiedBadge from '../Shared/VerifiedBadge';
+import VoiceRecorder from './VoiceRecorder';
 
 interface CreatePostProps {
   currentUser: User;
@@ -55,6 +56,11 @@ const CreatePost: React.FC<CreatePostProps> = ({ currentUser, onPost, variant = 
   // Editor State
   const [editingImageIndex, setEditingImageIndex] = useState<number | null>(null);
   const [imageAltTexts, setImageAltTexts] = useState<Record<number, string>>({});
+
+  // Voice Recording State
+  const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [audioDurationMs, setAudioDurationMs] = useState(0);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -291,8 +297,8 @@ const CreatePost: React.FC<CreatePostProps> = ({ currentUser, onPost, variant = 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate content
-    if (!content.trim() && !isPollMode && !gifUrl && selectedImages.length === 0) return;
+    // Validate content - also allow audio-only posts
+    if (!content.trim() && !isPollMode && !gifUrl && selectedImages.length === 0 && !audioBlob) return;
 
     // Check character limit
     if (isOverLimit) {
@@ -350,19 +356,31 @@ const CreatePost: React.FC<CreatePostProps> = ({ currentUser, onPost, variant = 
         }
       }
 
-      // 3. Create post
-      // Determine media type
-      let finalMediaType: 'image' | 'video' | 'gif' = mediaType;
-      if (gifUrl) finalMediaType = 'gif';
+      // 3. Create post (with audio or regular)
+      let newPost: Post;
 
-      const newPost = await createPost(
-        currentUser.id,
-        content,
-        imageUrls,
-        scheduledFor,
-        finalPollId,
-        finalMediaType
-      );
+      if (audioBlob && audioDurationMs > 0) {
+        // Create post with voice note
+        newPost = await createPostWithAudio(
+          currentUser.id,
+          content,
+          audioBlob,
+          audioDurationMs
+        );
+      } else {
+        // Determine media type
+        let finalMediaType: 'image' | 'video' | 'gif' = mediaType;
+        if (gifUrl) finalMediaType = 'gif';
+
+        newPost = await createPost(
+          currentUser.id,
+          content,
+          imageUrls,
+          scheduledFor,
+          finalPollId,
+          finalMediaType
+        );
+      }
 
       // Call the onPost callback if provided (only if not scheduled)
       if (onPost && !scheduledFor) {
@@ -380,6 +398,9 @@ const CreatePost: React.FC<CreatePostProps> = ({ currentUser, onPost, variant = 
       setScheduledDate('');
       setShowSchedulePicker(false);
       setImageAltTexts({}); // Clear alt texts
+      setAudioBlob(null);  // Clear audio
+      setAudioDurationMs(0);
+      setShowVoiceRecorder(false);
 
       if (scheduledFor) {
         alert('Post scheduled successfully!');
@@ -644,10 +665,53 @@ const CreatePost: React.FC<CreatePostProps> = ({ currentUser, onPost, variant = 
             </div>
           )}
 
+          {/* Voice Recorder UI */}
+          {showVoiceRecorder && (
+            <div className="mt-3">
+              <VoiceRecorder
+                autoStart={true}
+                onRecordingComplete={(blob, durationMs) => {
+                  setAudioBlob(blob);
+                  setAudioDurationMs(durationMs);
+                  setShowVoiceRecorder(false);
+                }}
+                onCancel={() => {
+                  setShowVoiceRecorder(false);
+                  setAudioBlob(null);
+                  setAudioDurationMs(0);
+                }}
+                maxDurationMs={15000}
+              />
+            </div>
+          )}
+
+          {/* Audio Preview */}
+          {audioBlob && !showVoiceRecorder && (
+            <div className="mt-3 bg-gradient-to-r from-nsp-teal/10 to-emerald-50 rounded-xl p-3 border border-nsp-teal/20 flex items-center gap-3">
+              <div className="w-10 h-10 bg-nsp-teal rounded-full flex items-center justify-center text-white">
+                <Icon icon="ph:microphone-fill" width="20" height="20" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-bold text-gray-900">Voice Note Ready</p>
+                <p className="text-xs text-gray-500">{(audioDurationMs / 1000).toFixed(1)}s recorded</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setAudioBlob(null);
+                  setAudioDurationMs(0);
+                }}
+                className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+              >
+                <Icon icon="ph:trash" width="18" height="18" />
+              </button>
+            </div>
+          )}
+
           <div className={`flex justify-between items-center mt-3 ${variant === 'modal' ? 'fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-3 sm:static sm:bg-transparent sm:border-none sm:p-0' : 'relative'}`}>
-            {/* Tools */}
-            <div className="flex gap-1 items-center z-20">
-              <div className="flex gap-0.5 items-center text-nsp-teal">
+            {/* Tools - scrollable on mobile */}
+            <div className="flex gap-1 items-center z-20 overflow-x-auto hide-scrollbar">
+              <div className="flex gap-0.5 items-center text-nsp-teal flex-shrink-0">
                 <input
                   type="file"
                   ref={fileInputRef}
@@ -724,6 +788,27 @@ const CreatePost: React.FC<CreatePostProps> = ({ currentUser, onPost, variant = 
                   disabled={isSubmitting}
                 >
                   <Icon icon="ph:calendar-plus" width="22" height="22" />
+                </button>
+                {/* Voice Note Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowVoiceRecorder(!showVoiceRecorder);
+                    setShowEmojiPicker(false);
+                    setShowGifPicker(false);
+                    setShowSchedulePicker(false);
+                  }}
+                  className={`p-2.5 rounded-full hover:bg-nsp-teal/10 transition-colors relative group ${showVoiceRecorder || audioBlob ? 'text-nsp-teal bg-nsp-teal/10' : ''}`}
+                  title="Voice Note"
+                  disabled={isSubmitting || !!selectedImages.length || !!gifUrl || isPollMode}
+                >
+                  <Icon icon="ph:microphone" width="22" height="22" />
+                  {audioBlob && (
+                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-nsp-teal rounded-full animate-pulse" />
+                  )}
+                  <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none font-bold">
+                    Voice
+                  </span>
                 </button>
               </div>
             </div>
