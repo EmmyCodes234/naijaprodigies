@@ -550,6 +550,30 @@ const PostCard: React.FC<PostCardProps> = ({ post, currentUser, onLike, onReply,
             </>
           )}
 
+          {/* Voice Note Player */}
+          {!post.is_rerack && post.audio_url && (
+            <div className="mb-2 mt-2 bg-gradient-to-r from-nsp-teal/10 to-emerald-50 rounded-2xl p-4 border border-nsp-teal/20">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-nsp-teal rounded-full flex items-center justify-center text-white flex-shrink-0">
+                  <Icon icon="ph:microphone-fill" width="20" height="20" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <audio
+                    controls
+                    src={post.audio_url}
+                    className="w-full h-8"
+                    preload="metadata"
+                  />
+                  {post.audio_duration_ms && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Duration: {(post.audio_duration_ms / 1000).toFixed(1)}s
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* AI Judge Result */}
           {aiComment && (
             <div className="mb-3 mt-2 bg-gradient-to-r from-nsp-teal/5 to-transparent border-l-4 border-nsp-teal p-3 rounded-r-lg animate-fade-in">
