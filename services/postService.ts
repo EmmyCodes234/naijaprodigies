@@ -188,6 +188,8 @@ export const createPost = async (
     scheduled_for: postData.scheduled_for,
     poll_id: postData.poll_id,
     media_type: postData.media_type,
+    audio_url: postData.audio_url,
+    audio_duration_ms: postData.audio_duration_ms,
     impressions_count: 0
   }
 }
@@ -430,6 +432,8 @@ export const getPosts = async (
       quote_text: post.quote_text,
       is_liked_by_current_user: likedByCurrentUser.has(post.id),
       is_saved_by_current_user: savedByCurrentUser.has(post.id),
+      audio_url: post.audio_url,
+      audio_duration_ms: post.audio_duration_ms,
       impressions_count: post.impressions_count || 0
     }
   })
@@ -469,9 +473,10 @@ export const getPostById = async (postId: string, currentUserId?: string): Promi
       )
     `)
     .eq('id', postId)
-    .single()
+    .maybeSingle()
 
   if (postError) {
+    console.error('getPostById error:', postError);
     throw new Error(`Failed to fetch post: ${postError.message}`)
   }
 
@@ -619,6 +624,8 @@ export const getPostById = async (postId: string, currentUserId?: string): Promi
     quote_text: postData.quote_text,
     is_liked_by_current_user: likedByCurrentUser.has(postData.id),
     is_saved_by_current_user: isSaved,
+    audio_url: postData.audio_url,
+    audio_duration_ms: postData.audio_duration_ms,
     impressions_count: postData.impressions_count || 0
   };
 }

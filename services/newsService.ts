@@ -69,9 +69,9 @@ export const detectUserLocation = async (): Promise<{ countryCode: string; count
  */
 const buildFeedUrl = (countryCode: string, category: keyof typeof TOPIC_IDS): string => {
     const locale = COUNTRY_LOCALES[countryCode] || COUNTRY_LOCALES['US'];
-    const topicId = TOPIC_IDS[category];
+    const topicId = TOPIC_IDS[category] || TOPIC_IDS['general'];
 
-    if (category === 'general') {
+    if (category === 'general' || !topicId) {
         // Top stories for the country
         return `https://news.google.com/rss?hl=${locale.hl}&gl=${locale.gl}&ceid=${locale.ceid}`;
     } else {
