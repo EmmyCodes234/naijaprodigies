@@ -296,20 +296,32 @@ const CreatePost: React.FC<CreatePostProps> = ({ currentUser, onPost, variant = 
 
   // Helper to upload audio and create post
   const createPostWithAudio = async (userId: string, content: string, blob: Blob, durationMs: number) => {
-    // 1. Upload audio
-    const audioUrl = await uploadVoiceNote(userId, blob);
+    console.log('[VoiceNote] Starting upload:', { userId, blobSize: blob.size, blobType: blob.type, durationMs });
+    alert(`[DEBUG] Starting upload: ${blob.size} bytes, type: ${blob.type}`);
 
-    // 2. Create post record
-    return await createPost(
-      userId,
-      content,
-      [], // no images
-      undefined, // scheduledFor
-      undefined, // pollId
-      'video', // Treat voice note as 'video' media type internally
-      audioUrl,
-      durationMs
-    );
+    try {
+      // 1. Upload audio
+      const audioUrl = await uploadVoiceNote(userId, blob);
+      console.log('[VoiceNote] Upload success:', audioUrl);
+      alert(`[DEBUG] Upload OK: ${audioUrl?.substring(0, 60)}...`);
+
+      // 2. Create post record
+      const post = await createPost(
+        userId,
+        content,
+        [], // no images
+        undefined, // scheduledFor
+        undefined, // pollId
+        'audio', // Treat voice note as 'audio' media type
+        audioUrl,
+        durationMs
+      );
+      console.log('[VoiceNote] Post created with audio_url:', post.audio_url);
+      return post;
+    } catch (error) {
+      console.error('[VoiceNote] Upload/create failed:', error);
+      throw error;
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

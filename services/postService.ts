@@ -14,7 +14,7 @@ export interface PostService {
   deletePost(postId: string, userId: string): Promise<void>
   likePost(postId: string, userId: string): Promise<void>
   unlikePost(postId: string, userId: string): Promise<void>
-  createComment(postId: string, userId: string, content: string, parentCommentId?: string, mediaUrl?: string, mediaType?: 'image' | 'video' | 'gif'): Promise<Comment>
+  createComment(postId: string, userId: string, content: string, parentCommentId?: string, mediaUrl?: string, mediaType?: 'image' | 'video' | 'gif' | 'audio'): Promise<Comment>
   createReRack(postId: string, userId: string, quoteText?: string): Promise<Post>
   savePost(postId: string, userId: string): Promise<void>
   unsavePost(postId: string, userId: string): Promise<void>
@@ -33,7 +33,7 @@ export const createPost = async (
   imageUrls?: string[],
   scheduledFor?: Date,
   pollId?: string,
-  mediaType: 'image' | 'video' | 'gif' = 'image',
+  mediaType: 'image' | 'video' | 'gif' | 'audio' = 'image',
   audioUrl?: string,
   audioDuration?: number
 ): Promise<Post> => {
@@ -247,6 +247,8 @@ export const getPosts = async (
       scheduled_for,
       poll_id,
       media_type,
+      audio_url,
+      audio_duration_ms,
       impressions_count,
       user:users!posts_user_id_fkey(
         id,
@@ -455,6 +457,8 @@ export const getPostById = async (postId: string, currentUserId?: string): Promi
       original_post_id,
       quote_text,
       impressions_count,
+      audio_url,
+      audio_duration_ms,
       user:users!posts_user_id_fkey(
         id,
         handle,
@@ -720,7 +724,7 @@ export const createComment = async (
   content: string,
   parentCommentId?: string,
   mediaUrl?: string,
-  mediaType?: 'image' | 'video' | 'gif'
+  mediaType?: 'image' | 'video' | 'gif' | 'audio'
 ): Promise<Comment> => {
   // Validate content is not empty (unless media is present)
   if (!content.trim() && !mediaUrl) {
@@ -1440,7 +1444,9 @@ export const subscribeToComments = (
             content: commentData.content,
             parent_comment_id: commentData.parent_comment_id,
             created_at: commentData.created_at,
-            replies: []
+            replies: [],
+            likes_count: 0,
+            is_liked_by_current_user: false
           }
 
           onNewComment(newComment)
